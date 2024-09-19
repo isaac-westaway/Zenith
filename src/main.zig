@@ -2,7 +2,7 @@ const std = @import("std");
 
 const zlog = @import("zlog");
 
-const Manager = @import("zwm.zig").Manager;
+const Manager = @import("Manager.zig").Manager;
 
 fn LogPrefix(allocator: *std.mem.Allocator, log_level: []const u8) []const u8 {
     const current_time = zlog.timestampToDatetime(allocator.*, std.time.timestamp());
@@ -18,13 +18,13 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     try zlog.initializeLogging(@constCast(&allocator), .{ .absolute_path = "/home/isaacwestaway/Documents/zig/zwm", .file_name = "zwm" }, .none);
-    try zlog.installLogPrefix(@constCast(&allocator), &LogPrefix);
+    // try zlog.installLogPrefix(@constCast(&allocator), &LogPrefix);
     defer zlog.Log.close();
 
     const Logger = zlog.Log;
     _ = Logger;
 
-    const manager: Manager = try Manager.init(@constCast(&allocator));
+    var manager: Manager = try Manager.init(@constCast(&allocator));
     defer manager.deinit();
     std.debug.assert(@TypeOf(manager) == Manager);
 

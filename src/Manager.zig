@@ -4,20 +4,21 @@ const root = @import("root");
 
 const Logger = @import("zlog");
 
-const c = @cImport({
-    @cInclude("X11/Xlib.h");
-    @cInclude("X11/XF86keysym.h");
-    @cInclude("X11/keysym.h");
-    @cInclude("X11/XKBlib.h");
-    @cInclude("X11/Xatom.h");
-    @cInclude("X11/Xutil.h");
-});
+const c = @import("x11.zig").c;
+
+const Layout = @import("Layout.zig").Layout;
+const Input = @import("Input.zig").Input;
+
 pub const Manager = struct {
     allocator: *std.mem.Allocator,
 
     x_display: *const c.Display,
     x_rootwindow: *const c.Window,
     x_screen: *c.Screen,
+
+    // what if initialized to a pointer so can modify memory values
+    layout: Layout,
+    input: Input,
 
     pub fn init(allocator: *std.mem.Allocator) !Manager {
         var manager: Manager = undefined;
@@ -28,6 +29,9 @@ pub const Manager = struct {
         manager.x_screen = c.XDefaultScreenOfDisplay(@constCast(manager.x_display));
         manager.x_rootwindow = &c.XDefaultRootWindow(@constCast(manager.x_display));
 
+        manager.layout = try Layout.init(manager.allocator, manager.x_display, manager.x_rootwindow);
+        manager.input = try Input.init(manager.allocator, manager.x_display, manager.x_rootwindow);
+
         _ = c.XSetErrorHandler(Manager.handleError);
 
         var window_attributes: c.XSetWindowAttributes = undefined;
@@ -37,20 +41,45 @@ pub const Manager = struct {
 
         try Logger.Log.info("ZWM_INIT", "Successfully Initialized the Window Manager", .{});
 
+        _ = c.XSync(@constCast(manager.x_display), 0);
+
         return manager;
     }
 
-    pub fn run(self: Manager) !void {
+    pub fn run(self: *Manager) !void {
+        try Logger.Log.info("ZWM_RUN", "Running the window manager", .{});
         while (true) {
             var event: c.XEvent = undefined;
             _ = c.XNextEvent(@constCast(self.x_display), &event);
 
             switch (event.type) {
-                c.ButtonPress => {
-                    try Logger.Log.info("ZWM_RUN", "Button Pressed", .{});
+                c.KeyPress => {
+                    try self.input.resolveKeyInput(&event.xkey);
                 },
 
-                else => {},
+                c.ButtonPress => {
+                    try self.layout.handleButtonPress(@constCast(&event.xbutton));
+                },
+
+                c.PointerMotionMask => {
+                    try Logger.Log.info("ZWM_RUN", "Pointer Motion Event: {any}", .{event.xmotion});
+                },
+
+                c.MotionNotify => {
+                    try self.layout.handleMotionNotify(&event.xmotion);
+                },
+
+                c.CreateNotify => {
+                    try self.layout.handleCreateNotify(&event.xcreatewindow);
+                },
+
+                c.MapRequest => {
+                    try self.layout.handleMapRequest(&event.xmaprequest);
+                },
+
+                else => {
+                    try Logger.Log.warn("ZWM_RUN", "Unhandled event", .{});
+                },
             }
         }
     }
@@ -65,7 +94,7 @@ pub const Manager = struct {
                 return 0;
             },
             c.BadWindow => {
-                _ = Logger.Log.err("ZWM_RUN", "BadWindow", .{}) catch {
+                _ = Logger.Log.err("ZWM_RUN", "BadWindow: {any}", .{event.*}) catch {
                     return undefined;
                 };
                 return 0;
@@ -76,7 +105,11 @@ pub const Manager = struct {
                 };
                 return 0;
             },
-            else => {},
+            else => {
+                _ = Logger.Log.err("ZWM_RUN", "Unhandled Error", .{}) catch {
+                    return undefined;
+                };
+            },
         }
 
         return 0;
