@@ -13,7 +13,6 @@ pub const Layout = struct {
 
     workspace: struct {
         mouse: c.XButtonEvent,
-        mouse_button: u32,
 
         win_x: i32,
         win_y: i32,
@@ -36,10 +35,18 @@ pub const Layout = struct {
 
         const screen = c.DefaultScreen(@constCast(layout.x_display));
 
+        layout.workspace.mouse = undefined;
+
+        layout.workspace.win_x = undefined;
+        layout.workspace.win_y = undefined;
+        layout.workspace.win_w = undefined;
+        layout.workspace.win_h = undefined;
+
         layout.workspace.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.workspace.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
 
-        layout.workspace = undefined;
+        layout.workspace.center_w = undefined;
+        layout.workspace.center_h = undefined;
 
         return layout;
     }
@@ -47,22 +54,22 @@ pub const Layout = struct {
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
         _ = self;
 
-        try Logger.Log.info("ZWM_RUN_HANDLECREATENOTIFY", "Handling Create Notification: {any}", .{event.window});
+        try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {any}", .{event.window});
     }
 
     pub fn handleMapRequest(self: *const Layout, event: *const c.XMapRequestEvent) !void {
-        var window_attributes: c.XWindowAttributes = undefined;
-        _ = c.XGetWindowAttributes(@constCast(self.x_display), event.window, &window_attributes);
-
         _ = c.XMapWindow(@constCast(self.x_display), event.window);
         _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
+
+        // for tiling, set the window size here
+        _ = c.XResizeWindow(@constCast(self.x_display), event.window, self.workspace.screen_w - 10, self.workspace.screen_h - 10);
+
+        var attributes: c.XWindowAttributes = undefined;
+        _ = c.XGetWindowAttributes(@constCast(self.x_display), event.window, &attributes);
     }
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
-        // This outputs a 1, one
-        try Logger.Log.info("ZWM_RUN_BUTTONPRESSED_HANDLEBUTTONPRESSED", "Button Pressed: {d}", .{event.button});
-
         if (event.subwindow == 0) return;
         var attributes: c.XWindowAttributes = undefined;
         _ = c.XGetWindowAttributes(@constCast(self.x_display), event.subwindow, &attributes);
@@ -73,27 +80,24 @@ pub const Layout = struct {
         self.workspace.win_y = attributes.y;
 
         self.workspace.mouse = @constCast(event).*;
-        self.workspace.mouse_button = @intCast(event.button);
-
-        // This outputs a 1, one
-        try Logger.Log.info("ZWM_RUN_BUTTON_PRESSED_HANDLEBUTTONPRESSED", "Button Window Details: W:{d}, H:{d}, X:{d}, Y:{d}", .{ self.workspace.win_w, self.workspace.win_h, self.workspace.win_x, self.workspace.win_y });
     }
 
     pub fn handleMotionNotify(self: *const Layout, event: *const c.XMotionEvent) !void {
-        // const dx: i32 = @intCast(event.x_root - self.workspace.mouse.x_root);
-        // const dy: i32 = @intCast(event.y_root - self.workspace.mouse.y_root);
-        try Logger.Log.info("ZWM_RUN_BUTTON_PRESSED_HANDLEBUTTONPRESSED", "Motion Window Details: X:{d}, Y:{d}", .{ event.x, event.y });
+        const diff_mag_x: c_int = event.x - self.workspace.mouse.x;
+        const diff_mag_y: c_int = event.y - self.workspace.mouse.y;
 
-        // We want to move relative from the initial position to the pointer, not make the windows x and y coords (top left) THE coords of the pointer
+        const new_x: c_int = self.workspace.win_x + diff_mag_x;
+        const new_y: c_int = self.workspace.win_y + diff_mag_y;
+
+        const w_x: c_uint = @intCast(self.workspace.win_w + (event.x - self.workspace.mouse.x));
+        const w_y: c_uint = @intCast(self.workspace.win_h + (event.y - self.workspace.mouse.y));
 
         const button: c_uint = self.workspace.mouse.button;
 
         if (button == 1) {
-            try Logger.Log.info("ZWM_RUN_HANDLEMOTIONNOTIFY", "Moving Window", .{});
-            _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, event.x, event.y);
+            _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, new_x, new_y);
         } else if (button == 3) {
-            try Logger.Log.info("ZWM_RUN_MOTIONNOTIFY_HANDLEMOTIONNOTIFY", "Unhandled", .{});
-            // _ = c.XMoveResizeWindow(@constCast(self.x_display), event.window, self.workspace.win_x, self.workspace.win_y, @as(c_uint, @intCast(self.workspace.win_w)) + dx, @as(c_uint, @intCast(self.workspace.win_h)) + dy);
+            _ = c.XResizeWindow(@constCast(self.x_display), event.subwindow, w_x, w_y);
         } else {
             try Logger.Log.info("ZWM_RUN_MOTIONNOTIFY_HANDLEMOTIONNOTIFY", "Logical Comparison did NOT work: {d}", .{button});
         }
