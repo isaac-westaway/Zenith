@@ -77,6 +77,14 @@ pub const Manager = struct {
                     try self.layout.handleMapRequest(&event.xmaprequest);
                 },
 
+                c.EnterNotify => {
+                    try self.layout.handleEnterNotify(&event.xcrossing);
+                },
+
+                c.LeaveNotify => {
+                    try self.layout.handleLeaveNotify(&event.xcrossing);
+                },
+
                 else => {
                     try Logger.Log.warn("ZWM_RUN", "Unhandled event", .{});
                 },

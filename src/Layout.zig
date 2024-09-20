@@ -11,7 +11,10 @@ pub const Layout = struct {
     x_rootwindow: *const c.Window,
     x_screen: *const c.Screen,
 
+    // make this an std.Array to have multiple workspaces traversed by mod4+D
     workspace: struct {
+        windows: std.ArrayList(c.Window),
+
         mouse: c.XButtonEvent,
 
         win_x: i32,
@@ -35,6 +38,8 @@ pub const Layout = struct {
 
         const screen = c.DefaultScreen(@constCast(layout.x_display));
 
+        layout.workspace.windows = std.ArrayList(c.Window).init(layout.allocator.*);
+
         layout.workspace.mouse = undefined;
 
         layout.workspace.win_x = undefined;
@@ -57,7 +62,9 @@ pub const Layout = struct {
         try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {any}", .{event.window});
     }
 
-    pub fn handleMapRequest(self: *const Layout, event: *const c.XMapRequestEvent) !void {
+    pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
+        _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
+
         _ = c.XMapWindow(@constCast(self.x_display), event.window);
         _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
@@ -65,8 +72,9 @@ pub const Layout = struct {
         // for tiling, set the window size here
         _ = c.XResizeWindow(@constCast(self.x_display), event.window, self.workspace.screen_w - 10, self.workspace.screen_h - 10);
 
-        var attributes: c.XWindowAttributes = undefined;
-        _ = c.XGetWindowAttributes(@constCast(self.x_display), event.window, &attributes);
+        try self.workspace.windows.append(event.window);
+
+        try Logger.Log.info("ZWM_RUN_MAPREQUEST_HANDLEMAPREQUEST", "Windows: {any}", .{self.workspace.windows.items});
     }
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
@@ -95,11 +103,25 @@ pub const Layout = struct {
         const button: c_uint = self.workspace.mouse.button;
 
         if (button == 1) {
+            _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, 0xFFFFFF);
             _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, new_x, new_y);
         } else if (button == 3) {
+            _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, 0xFFFFFF);
             _ = c.XResizeWindow(@constCast(self.x_display), event.subwindow, w_x, w_y);
         } else {
             try Logger.Log.info("ZWM_RUN_MOTIONNOTIFY_HANDLEMOTIONNOTIFY", "Logical Comparison did NOT work: {d}", .{button});
         }
+    }
+
+    pub fn handleEnterNotify(self: *const Layout, event: *const c.XCrossingEvent) !void {
+        _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
+        _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0xFFFFFF);
+    }
+
+    pub fn handleLeaveNotify(self: *const Layout, event: *const c.XCrossingEvent) !void {
+        _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
+
+        // unfocus window
+        _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
     }
 };
