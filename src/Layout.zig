@@ -4,6 +4,11 @@ const Logger = @import("zlog");
 
 const c = @import("x11.zig").c;
 
+const Actions = @import("actions.zig");
+const Keys = @import("keys.zig");
+
+const Window = struct { window: c.Window };
+
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
 
@@ -13,7 +18,14 @@ pub const Layout = struct {
 
     // make this an std.Array to have multiple workspaces traversed by mod4+D
     workspace: struct {
-        windows: std.ArrayList(c.Window),
+        windows: *std.DoublyLinkedList(Window),
+        current_focused_window: *std.DoublyLinkedList(Window).Node,
+
+        fullscreen: bool,
+        fullscreen_prev_x: c_int,
+        fullscreen_prev_y: c_int,
+        fullscreen_prev_h: c_int,
+        fullscreen_prev_w: c_int,
 
         mouse: c.XButtonEvent,
 
@@ -24,8 +36,6 @@ pub const Layout = struct {
 
         screen_w: c_uint,
         screen_h: c_uint,
-        center_w: c_uint,
-        center_h: c_uint,
     },
 
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: *const c.Window) !Layout {
@@ -38,43 +48,123 @@ pub const Layout = struct {
 
         const screen = c.DefaultScreen(@constCast(layout.x_display));
 
-        layout.workspace.windows = std.ArrayList(c.Window).init(layout.allocator.*);
-
-        layout.workspace.mouse = undefined;
-
-        layout.workspace.win_x = undefined;
-        layout.workspace.win_y = undefined;
-        layout.workspace.win_w = undefined;
-        layout.workspace.win_h = undefined;
+        layout.workspace.fullscreen = false;
 
         layout.workspace.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.workspace.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
 
-        layout.workspace.center_w = undefined;
-        layout.workspace.center_h = undefined;
-
         return layout;
+    }
+
+    pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
+        try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Attempting to resolve key pressed with the keycode: {any}", .{event.keycode});
+
+        // TODO: make this more dynamic, to see keycodes run `xev` in a terminal
+        if (event.keycode == 36) {
+            try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "XK_Return pressed", .{});
+            Actions.openTerminal(self.allocator);
+
+            return;
+        }
+
+        if (event.keycode == 9) {
+            // Exit
+            try Logger.Log.fatal("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Closing Window Manager", .{});
+
+            return; // this is unreachable
+        }
+
+        if (event.keycode == 41) {
+            try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Toggling fullscreen", .{});
+
+            // TODO: set border width and colour in a config
+
+            // if (self.workspace.fullscreen == false) {
+            //     var attributes: c.XWindowAttributes = undefined;
+            //     _ = c.XGetWindowAttributes(@constCast(self.x_display), self.workspace.current_focused_window.data, &attributes);
+
+            //     self.workspace.fullscreen_prev_x = attributes.x;
+            //     self.workspace.fullscreen_prev_y = attributes.y;
+
+            //     self.workspace.fullscreen_prev_w = attributes.width;
+            //     self.workspace.fullscreen_prev_h = attributes.height;
+
+            //     _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspace.current_focused_window.data, 1);
+
+            //     _ = c.XRaiseWindow(@constCast(self.x_display), self.workspace.current_focused_window.data);
+            //     _ = c.XMoveWindow(@constCast(self.x_display), self.workspace.current_focused_window.data, 0, 0);
+            //     _ = c.XResizeWindow(@constCast(self.x_display), self.workspace.current_focused_window.data, @as(c_uint, @intCast(self.workspace.screen_w)) - 2, @as(c_uint, @intCast(self.workspace.screen_h)) - 2);
+
+            //     self.workspace.fullscreen = true;
+
+            //     return;
+            // }
+
+            // if (self.workspace.fullscreen == true) {
+            //     _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspace.current_focused_window.data, 5);
+
+            //     _ = c.XMoveWindow(@constCast(self.x_display), self.workspace.current_focused_window.data, self.workspace.fullscreen_prev_x, self.workspace.fullscreen_prev_y);
+            //     _ = c.XResizeWindow(@constCast(self.x_display), self.workspace.current_focused_window.data, @as(c_uint, @intCast(self.workspace.fullscreen_prev_w)), @as(c_uint, @intCast(self.workspace.fullscreen_prev_h)));
+            //     self.workspace.fullscreen = false;
+
+            //     return;
+            // }
+        }
+
+        if (event.keycode == 23) {
+            // TODO: cycling windows
+            // actions.cycleWindow
+            // Cycle the window
+
+            // If at the last window, then raise first
+            // if (self.workspace.windows.items[self.workspace.current_focused_window_index] == self.workspace.windows.getLast()) {
+            //     self.workspace.current_focused_window_index = 0;
+            //     _ = c.XRaiseWindow(@constCast(self.x_display), self.workspace.windows.items[self.workspace.current_focused_window_index]);
+            // } else {
+            //     _ = c.XRaiseWindow(@constCast(self.x_display), self.workspace.windows.items[self.workspace.current_focused_window_index + 1]);
+            // }
+
+            // current focus set it in enter notify
+
+            // _ = c.XSetInputFocus(@constCast(self.x_display), self.workspace.windows.items[1], c.RevertToParent, c.CurrentTime);
+            // _ = c.XSetWindowBorder(@constCast(self.x_display), self.workspace.windows.items[1], 0xFFFFFF);
+        }
     }
 
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
         _ = self;
 
-        try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {any}", .{event.window});
+        try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {d}", .{event.window});
     }
 
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
+        try Logger.Log.info("ZWM_RUN_MAPREQUEST_HANDLEMAPREQUEST", "Mapping Window: {d}", .{event.window});
+
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
 
+        // TODO: update this so that the doubly linked list type isnot a window but a struct containing the windows x and y and w and h vals and staccking order
+        const window: Window = Window{
+            .window = event.window,
+        };
+
+        var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
+
+        node.prev = self.workspace.windows.last orelse null;
+        node.data = window;
+        node.next = undefined;
+
+        self.workspace.windows.append(node);
+
+        // TODO: set border width and colour in a config
         _ = c.XMapWindow(@constCast(self.x_display), event.window);
         _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
+    }
 
-        // for tiling, set the window size here
-        _ = c.XResizeWindow(@constCast(self.x_display), event.window, self.workspace.screen_w - 10, self.workspace.screen_h - 10);
+    pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
+        try Logger.Log.info("ZWM_RUN_DESTROYNOTIFY_HANDLEDESTROYNOTIFY", "Destroying Window: {d}", .{event.window});
 
-        try self.workspace.windows.append(event.window);
-
-        try Logger.Log.info("ZWM_RUN_MAPREQUEST_HANDLEMAPREQUEST", "Windows: {any}", .{self.workspace.windows.items});
+        _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
     }
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
@@ -102,6 +192,7 @@ pub const Layout = struct {
 
         const button: c_uint = self.workspace.mouse.button;
 
+        // TODO: set border width and colour in a config
         if (button == 1) {
             _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, 0xFFFFFF);
             _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, new_x, new_y);
@@ -113,12 +204,25 @@ pub const Layout = struct {
         }
     }
 
-    pub fn handleEnterNotify(self: *const Layout, event: *const c.XCrossingEvent) !void {
+    pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
+        // TODO: set border width and colour in a config
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0xFFFFFF);
+
+        // Traverse the window list and make the node with the data equal to the event.window the current focused
+        // var ptr: ?*std.DoublyLinkedList(c.Window).Node = self.workspace.windows.first;
+
+        // while (ptr) |current_node| {
+        //     if (event.window == current_node.data) {
+        //         self.workspace.current_focused_window = @ptrCast(current_node);
+        //     }
+
+        //     ptr = current_node.next;
+        // }
     }
 
-    pub fn handleLeaveNotify(self: *const Layout, event: *const c.XCrossingEvent) !void {
+    pub fn handleLeaveNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
+        // TODO: set border width and colour in a config
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
 
         // unfocus window

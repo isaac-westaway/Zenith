@@ -16,7 +16,6 @@ pub const Manager = struct {
     x_rootwindow: *const c.Window,
     x_screen: *c.Screen,
 
-    // what if initialized to a pointer so can modify memory values
     layout: Layout,
     input: Input,
 
@@ -54,7 +53,7 @@ pub const Manager = struct {
 
             switch (event.type) {
                 c.KeyPress => {
-                    try self.input.resolveKeyInput(&event.xkey);
+                    try self.layout.resolveKeyInput(&event.xkey);
                 },
 
                 c.ButtonPress => {
@@ -73,6 +72,10 @@ pub const Manager = struct {
                     try self.layout.handleCreateNotify(&event.xcreatewindow);
                 },
 
+                c.DestroyNotify => {
+                    try self.layout.handleDestroyNotify(&event.xdestroywindow);
+                },
+
                 c.MapRequest => {
                     try self.layout.handleMapRequest(&event.xmaprequest);
                 },
@@ -85,9 +88,7 @@ pub const Manager = struct {
                     try self.layout.handleLeaveNotify(&event.xcrossing);
                 },
 
-                else => {
-                    try Logger.Log.warn("ZWM_RUN", "Unhandled event", .{});
-                },
+                else => {},
             }
         }
     }
