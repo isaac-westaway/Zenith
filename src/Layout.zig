@@ -37,8 +37,8 @@ pub const Layout = struct {
         win_w: i32,
         win_h: i32,
 
-        screen_w: c_uint,
-        screen_h: c_uint,
+        screen_w: c_int,
+        screen_h: c_int,
     },
 
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: *const c.Window) !Layout {
@@ -162,11 +162,18 @@ pub const Layout = struct {
             .window = event.window,
         };
 
+        // TODO: handling creation tiling, similar to ragnar
+        // This will be done by mapping a window, and with the `last` of self.workspace.windows.last before the new window is appeneded
+        // travel all the way down using last last last resizing all the windows, one before the initial starting window
+        // because the starting window should take up half the screen before modification and resizing
+
+        // NEVER AUTOMATICALLY MOVE WINDOWS!!! I HATE WINDOW MANAGERS THAT DO THIS!!! THIS IS WHY IS CREATED MY OWN
+
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
         self.workspace.windows.append(node);
 
-        _ = c.XResizeWindow(@constCast(self.x_display), event.window, self.workspace.screen_w - 10, self.workspace.screen_h - 10);
+        _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.workspace.screen_w - 10), @abs(self.workspace.screen_h - 10));
 
         // TODO: set border width and colour in a config
         _ = c.XMapWindow(@constCast(self.x_display), event.window);
@@ -218,9 +225,8 @@ pub const Layout = struct {
         const new_x: c_int = self.workspace.win_x + diff_mag_x;
         const new_y: c_int = self.workspace.win_y + diff_mag_y;
 
-        // investigate how this can become negative because an error showed up that caused a panic because w_y was negative.
-        const w_x: c_uint = @intCast(self.workspace.win_w + (event.x - self.workspace.mouse.x));
-        const w_y: c_uint = @intCast(self.workspace.win_h + (event.y - self.workspace.mouse.y));
+        const w_x: c_uint = @abs(self.workspace.win_w + (event.x - self.workspace.mouse.x));
+        const w_y: c_uint = @abs(self.workspace.win_h + (event.y - self.workspace.mouse.y));
 
         const button: c_uint = self.workspace.mouse.button;
 
