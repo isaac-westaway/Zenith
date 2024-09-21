@@ -61,6 +61,7 @@ pub const Layout = struct {
         return layout;
     }
 
+    // Should be broken into its own functions in actions.zig
     pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
         try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Attempting to resolve key pressed with the keycode: {any}", .{event.keycode});
 
@@ -173,12 +174,53 @@ pub const Layout = struct {
         node.data = window;
         self.workspace.windows.append(node);
 
-        _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.workspace.screen_w - 10), @abs(self.workspace.screen_h - 10));
+        var initial_tiled_window_heights: c_int = 0;
+        if (self.workspace.windows.len <= 2) {
+            initial_tiled_window_heights = 0;
+        } else {
+            initial_tiled_window_heights = @intCast(5 * self.workspace.windows.len);
+        }
 
-        // TODO: set border width and colour in a config
-        _ = c.XMapWindow(@constCast(self.x_display), event.window);
-        _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
-        _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
+        if (self.workspace.windows.len >= 2) {
+            // Map the event window
+            _ = c.XMapWindow(@constCast(self.x_display), event.window);
+            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
+            _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
+
+            // Resize the initial window to half, though this should be changed later to check if the initial (half screen) window has been moved
+            _ = c.XResizeWindow(@constCast(self.x_display), self.workspace.windows.first.?.data.window, @divFloor(@abs(self.workspace.screen_w - 10), 2), @abs(self.workspace.screen_h - 10));
+
+            // The second window
+            _ = c.XMoveWindow(@constCast(self.x_display), self.workspace.windows.first.?.next.?.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), 0);
+
+            // The rest of the windows
+            _ = c.XMoveWindow(@constCast(self.x_display), self.workspace.windows.last.?.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), initial_tiled_window_heights);
+
+            // Iterate through the list of windows starting at the second window
+            var start: ?*std.DoublyLinkedList(Window).Node = self.workspace.windows.first.?.next.?;
+
+            var index: u64 = 0;
+            while (start) |win| : (start = win.next) {
+                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), @intCast(@divFloor(@abs(self.workspace.screen_h - 10), (self.workspace.windows.len - 1))));
+                // Move the window beneath the previous
+
+                // so much casting :(
+                const height_of_each_window: c_int = @intCast(@divFloor(self.workspace.screen_h, @as(c_int, @intCast((self.workspace.windows.len - 1)))));
+
+                // This could be done by updating the `Window` type to store all of its parameters
+                _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(self.workspace.screen_w, 2) + 10), @intCast(((height_of_each_window) * @as(c_int, @intCast(index)))));
+                index += 1;
+            }
+
+            // TODO: set border width and colour in a config
+        } else {
+            _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.workspace.screen_w - 10), @abs(self.workspace.screen_h - 10));
+
+            // TODO: set border width and colour in a config
+            _ = c.XMapWindow(@constCast(self.x_display), event.window);
+            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
+            _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
+        }
     }
 
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
@@ -218,6 +260,7 @@ pub const Layout = struct {
         self.workspace.mouse = @constCast(event).*;
     }
 
+    // TODO: raise the window when clicked
     pub fn handleMotionNotify(self: *Layout, event: *const c.XMotionEvent) !void {
         const diff_mag_x: c_int = event.x - self.workspace.mouse.x;
         const diff_mag_y: c_int = event.y - self.workspace.mouse.y;
