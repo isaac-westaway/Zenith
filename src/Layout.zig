@@ -28,7 +28,6 @@ const Window = struct {
     w_h: u32,
 };
 
-// Is there an elegant way of maintaining the stacking index of windows?
 const Workspace = struct {
     windows: std.DoublyLinkedList(Window),
     current_focused_window: *std.DoublyLinkedList(Window).Node,
@@ -56,7 +55,6 @@ pub const Layout = struct {
     screen_w: c_int,
     screen_h: c_int,
 
-    // Allow for dynamic workspace creation, similar to windows creating desktops
     workspaces: std.ArrayList(Workspace),
     current_ws: u32,
 
@@ -96,7 +94,6 @@ pub const Layout = struct {
             try layout.workspaces.append(workspace);
         }
 
-        // 0 for the start of the array, in the window manager's taskbar, this should be one
         layout.current_ws = 0;
         for (layout.workspaces.items) |*workspace| {
             workspace.* = Workspace{
@@ -210,50 +207,64 @@ pub const Layout = struct {
         }
 
         // right
-        // Create a `workspace` struct in another file and offload a lot of this file
-        // Lots of indentaation, could easily move this into another separate file and function
+        // TODO: fix these two blocks of code upp
         if (event.keycode == 40) {
+            var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
+
+            while (ptr) |node| : (ptr = node.next) {
+                _ = c.XUnmapWindow(@constCast(self.x_display), node.data.window);
+            }
+
             try Logger.Log.info("ZWM_RUN_ONKEYPRESS_HANDLEKEYPRESS", "Current Workspace: {d}", .{self.current_ws});
             if (self.current_ws == self.workspaces.items.len - 1) {
                 self.current_ws = 0;
 
                 try Logger.Log.info("ZWM_RUN_ONKEYPRESS_HANDLEKEYPRESS", "Mapping a bunch of windows", .{});
-                var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
+                var windows: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
 
-                while (ptr) |node| : (ptr = node.prev) {
+                while (windows) |node| : (windows = node.prev) {
                     _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
                 }
             } else {
                 self.current_ws += 1;
-                // If the previous has windows, unmap all of it
-                // unmap previous windows and map current index in self.current_ws
-                if (self.workspaces.items[self.current_ws - 1].windows.len > 0) {
-
-                    // Unmap all windows of the previous workspace
-                    var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws - 1].windows.first;
-                    while (ptr) |node| : (ptr = node.next) {
-                        _ = c.XUnmapWindow(@constCast(self.x_display), node.data.window);
-                    }
-                }
-
                 if (self.workspaces.items[self.current_ws].windows.len > 0) {
                     try Logger.Log.info("ZWM_RUN_ONKEYPRESS_HANDLEKEYPRESS", "Mapping a bunch of windows", .{});
-                    var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
+                    var windows: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
 
-                    while (ptr) |node| : (ptr = node.prev) {
+                    while (windows) |node| : (windows = node.prev) {
                         _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
                     }
                 }
             }
         }
 
+        // Left
         if (event.keycode == 38) {
+            var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
+
+            while (ptr) |node| : (ptr = node.next) {
+                _ = c.XUnmapWindow(@constCast(self.x_display), node.data.window);
+            }
+
             if (self.current_ws == 0) {
-                self.current_ws = @intCast(self.workspaces.items.len);
+                self.current_ws = @intCast(self.workspaces.items.len - 1);
             } else {
                 self.current_ws -= 1;
             }
+
+            var windows: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
+
+            while (windows) |node| : (windows = node.prev) {
+                _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
+            }
         }
+
+        // TODO: quality of life additions, mod4 + q to quit the currently focused window
+        // TODO: three border colours: one for hard focused, one for soft focused (hovered) and one for unfocused
+
+        // TODO: Background images
+
+        // TODO: move everything else outlines into a configuration and refactor some areas
     }
 
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
@@ -262,6 +273,7 @@ pub const Layout = struct {
         try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {d}", .{event.window});
     }
 
+    // TODO: if the window has been modified, in the boolean state, then do not automatically tile when a new window is mapped
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
         try Logger.Log.info("ZWM_RUN_MAPREQUEST", "Handling Map Request", .{});
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
@@ -399,11 +411,6 @@ pub const Layout = struct {
         // TODO: set border width and colour in a config
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0xFFFFFF);
-
-        // Traverse the window list and make the node with the data equal to the event.window the current focused
-        const window = self.windowToNode(event.window);
-
-        self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(window);
     }
 
     pub fn handleLeaveNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
