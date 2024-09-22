@@ -4,46 +4,13 @@ const Logger = @import("zlog");
 
 const c = @import("x11.zig").c;
 
+const Window = @import("Window.zig").Window;
+const Workspace = @import("Workspace.zig").Workspace;
+
 const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
-
-const Window = struct {
-    window: c.Window,
-    fullscreen: bool,
-    modified: bool,
-
-    // We need fullscreen window data because what if the user chooses to move around the fullscreen window
-    f_x: i32,
-    f_y: i32,
-
-    f_w: u32,
-    f_h: u32,
-
-    w_x: i32,
-    w_y: i32,
-
-    w_w: u32,
-    w_h: u32,
-};
-
-const Workspace = struct {
-    windows: std.DoublyLinkedList(Window),
-    current_focused_window: *std.DoublyLinkedList(Window).Node,
-
-    fullscreen: bool,
-    fs_window: *std.DoublyLinkedList(Window).Node,
-
-    // Could be moved into `Layout` scope
-    mouse: c.XButtonEvent,
-
-    // Temp variables when a window is clicked to handle the point between clicking and clicking and dragging
-    win_x: i32,
-    win_y: i32,
-    win_w: i32,
-    win_h: i32,
-};
 
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
@@ -259,7 +226,18 @@ pub const Layout = struct {
             }
         }
 
+        if (event.keycode == 24) {
+            _ = c.XDestroyWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window);
+
+            if (self.workspaces.items[self.current_ws].windows.len > 0) {
+                self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(self.workspaces.items[self.current_ws].windows.first);
+            } else {
+                self.workspaces.items[self.current_ws].current_focused_window = undefined;
+            }
+        }
+
         // TODO: quality of life additions, mod4 + q to quit the currently focused window
+        // TODO: add the ability to cycle currently focused window up or down a workspace
         // TODO: three border colours: one for hard focused, one for soft focused (hovered) and one for unfocused
 
         // TODO: Background images
@@ -330,10 +308,12 @@ pub const Layout = struct {
         // Again, why can the width and height of the window be negative?
         self.workspaces.items[self.current_ws].windows.last.?.data.w_w = @abs(attributes.width);
         self.workspaces.items[self.current_ws].windows.last.?.data.w_h = @abs(attributes.height);
+
+        self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(self.workspaces.items[self.current_ws].windows.last);
     }
 
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
-        try Logger.Log.info("HANDLEDESTROYNOTIFY", "Current Workspace: {d}", .{self.current_ws});
+        try Logger.Log.info("ZWM_RUN_DESTROY", "Recieved destruction event", .{});
         const window = self.windowToNode(event.window);
 
         if (window) |w| {
@@ -362,10 +342,12 @@ pub const Layout = struct {
 
         _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
 
-        const window = self.windowToNode(event.window);
+        const window = self.windowToNode(event.subwindow);
         if (window) |w| {
             self.workspaces.items[self.current_ws].windows.remove(w);
             self.workspaces.items[self.current_ws].windows.prepend(w);
+
+            self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(w);
         }
     }
 
