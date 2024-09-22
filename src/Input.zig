@@ -32,6 +32,9 @@ pub const Input = struct {
 
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_f), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
 
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_d), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_a), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
+
         _ = c.XGrabButton(@constCast(input.x_display), 1, c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.ButtonPress | c.Button1MotionMask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
 
         _ = c.XGrabButton(@constCast(input.x_display), 3, c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.ButtonPress | c.Button3Mask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);

@@ -9,8 +9,6 @@ const Keys = @import("keys.zig");
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
 
-// Fix the design of the window manager by having each window have its own x,y w,h fullscreen, and focused attribute
-// Begin working on workspaces with window+daa
 const Window = struct {
     window: c.Window,
     fullscreen: bool,
@@ -60,7 +58,7 @@ pub const Layout = struct {
 
     // Allow for dynamic workspace creation, similar to windows creating desktops
     workspaces: std.ArrayList(Workspace),
-    current_ws: u8,
+    current_ws: u32,
 
     fn windowToNode(self: *const Layout, window: c.Window) ?*std.DoublyLinkedList(Window).Node {
         var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
@@ -210,6 +208,52 @@ pub const Layout = struct {
 
             return;
         }
+
+        // right
+        // Create a `workspace` struct in another file and offload a lot of this file
+        // Lots of indentaation, could easily move this into another separate file and function
+        if (event.keycode == 40) {
+            try Logger.Log.info("ZWM_RUN_ONKEYPRESS_HANDLEKEYPRESS", "Current Workspace: {d}", .{self.current_ws});
+            if (self.current_ws == self.workspaces.items.len - 1) {
+                self.current_ws = 0;
+
+                try Logger.Log.info("ZWM_RUN_ONKEYPRESS_HANDLEKEYPRESS", "Mapping a bunch of windows", .{});
+                var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
+
+                while (ptr) |node| : (ptr = node.prev) {
+                    _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
+                }
+            } else {
+                self.current_ws += 1;
+                // If the previous has windows, unmap all of it
+                // unmap previous windows and map current index in self.current_ws
+                if (self.workspaces.items[self.current_ws - 1].windows.len > 0) {
+
+                    // Unmap all windows of the previous workspace
+                    var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws - 1].windows.first;
+                    while (ptr) |node| : (ptr = node.next) {
+                        _ = c.XUnmapWindow(@constCast(self.x_display), node.data.window);
+                    }
+                }
+
+                if (self.workspaces.items[self.current_ws].windows.len > 0) {
+                    try Logger.Log.info("ZWM_RUN_ONKEYPRESS_HANDLEKEYPRESS", "Mapping a bunch of windows", .{});
+                    var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
+
+                    while (ptr) |node| : (ptr = node.prev) {
+                        _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
+                    }
+                }
+            }
+        }
+
+        if (event.keycode == 38) {
+            if (self.current_ws == 0) {
+                self.current_ws = @intCast(self.workspaces.items.len);
+            } else {
+                self.current_ws -= 1;
+            }
+        }
     }
 
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
@@ -219,6 +263,7 @@ pub const Layout = struct {
     }
 
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
+        try Logger.Log.info("ZWM_RUN_MAPREQUEST", "Handling Map Request", .{});
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
 
         // TODO: update this so that the doubly linked list type isnot a window but a struct containing the windows x and y and w and h vals and staccking order
@@ -226,7 +271,7 @@ pub const Layout = struct {
 
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
-        self.workspaces.items[self.current_ws].windows.append(node);
+        self.workspaces.items[self.current_ws].windows.prepend(node);
 
         if (self.workspaces.items[self.current_ws].windows.len >= 2) {
             _ = c.XMapWindow(@constCast(self.x_display), event.window);
@@ -234,7 +279,6 @@ pub const Layout = struct {
             _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
 
             _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, @divFloor(@abs(self.screen_w - 10), 2), @abs(self.screen_h - 10));
-
             _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, 0, 0);
 
             var start: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first.?.next.?;
@@ -244,13 +288,14 @@ pub const Layout = struct {
             // Auto tile just makes the currently focused window take up the entire sceren without fullscreening
             var index: u64 = 0;
             while (start) |win| : (start = win.next) {
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.screen_h - 10), (self.workspaces.items[self.current_ws].windows.len - 1)) - 1 * self.workspaces.items[self.current_ws].windows.len)));
+                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.screen_h - 10), (self.workspaces.items[self.current_ws].windows.len - 1)) - (1 * self.workspaces.items[self.current_ws].windows.len) - 10)));
 
                 // so much casting :(
                 const height_of_each_window: c_int = @intCast(@divFloor(self.screen_h, @as(c_int, @intCast((self.workspaces.items[self.current_ws].windows.len - 1)))));
 
                 // This could be done by updating the `Window` type to store all of its parameters
                 _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(self.screen_w, 2) + 10), @intCast(((height_of_each_window) * @as(c_int, @intCast(index)))));
+                _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
                 index += 1;
             }
 
@@ -304,6 +349,12 @@ pub const Layout = struct {
         self.workspaces.items[self.current_ws].mouse = @constCast(event).*;
 
         _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
+
+        const window = self.windowToNode(event.window);
+        if (window) |w| {
+            self.workspaces.items[self.current_ws].windows.remove(w);
+            self.workspaces.items[self.current_ws].windows.prepend(w);
+        }
     }
 
     // TODO: raise the window when clicked
@@ -322,7 +373,11 @@ pub const Layout = struct {
         const window = self.windowToNode(event.window);
         if (window) |w| {
             w.data.modified = true;
+            self.workspaces.items[self.current_ws].windows.remove(w);
+            self.workspaces.items[self.current_ws].windows.prepend(w);
         }
+
+        _ = c.XRaiseWindow(@constCast(self.x_display), event.window);
 
         // TODO: set border width and colour in a config
         // TODO: handle window movement and reisizing when fullscreen is true
