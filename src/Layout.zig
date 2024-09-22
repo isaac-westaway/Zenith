@@ -8,7 +8,24 @@ const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
 
 // Fix the design of the window manager by having each window have its own x,y w,h fullscreen, and focused attribute
-const Window = struct { window: c.Window, modified: bool };
+// Begin working on workspaces with window+daa
+const Window = struct {
+    window: c.Window,
+    fullscreen: bool,
+    modified: bool,
+
+    f_x: i32,
+    f_y: i32,
+
+    f_w: u32,
+    f_h: u32,
+
+    w_x: i32,
+    w_y: i32,
+
+    w_w: u32,
+    w_h: u32,
+};
 
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
