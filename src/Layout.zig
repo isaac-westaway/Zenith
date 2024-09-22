@@ -8,7 +8,7 @@ const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
 
 // Fix the design of the window manager by having each window have its own x,y w,h fullscreen, and focused attribute
-const Window = struct { window: c.Window };
+const Window = struct { window: c.Window, modified: bool };
 
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
@@ -41,6 +41,19 @@ pub const Layout = struct {
         screen_h: c_int,
     },
 
+    fn windowToNode(self: *const Layout, window: c.Window) ?*std.DoublyLinkedList(Window).Node {
+        var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspace.windows.first;
+
+        while (ptr) |node| : (ptr = node.next) {
+            if (node.data.window == window) {
+                return node;
+            } else continue;
+        }
+
+        _ = Logger.Log.err("ZWM_RUN_WINTONODE", "Unable to find window in window list: {d}", .{window}) catch {};
+        return null;
+    }
+
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: *const c.Window) !Layout {
         var layout: Layout = undefined;
 
@@ -63,26 +76,18 @@ pub const Layout = struct {
 
     // Should be broken into its own functions in actions.zig
     pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
-        try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Attempting to resolve key pressed with the keycode: {any}", .{event.keycode});
-
         // TODO: make this more dynamic, to see keycodes run `xev` in a terminal
         if (event.keycode == 36) {
-            try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "XK_Return pressed", .{});
             Actions.openTerminal(self.allocator);
 
             return;
         }
 
         if (event.keycode == 9) {
-            // Exit
             try Logger.Log.fatal("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Closing Window Manager", .{});
-
-            return; // this is unreachable
         }
 
         if (event.keycode == 41) {
-            try Logger.Log.info("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Toggling fullscreen", .{});
-
             // TODO: set border width and colour in a config
 
             if (self.workspace.fullscreen == false) {
@@ -117,28 +122,34 @@ pub const Layout = struct {
             }
         }
 
-        // TODO: could probably implement mod4+shift+tab to go backwards, but that seems trivial
-        if (event.keycode == 23 and self.workspace.windows.len > 0) {
-            if (self.workspace.windows.last.?.data.window == self.workspace.current_focused_window.data.window) {
-                self.workspace.current_focused_window = @ptrCast(self.workspace.windows.first);
-            } else if (self.workspace.current_focused_window.next == null) {
-                self.workspace.current_focused_window = @ptrCast(self.workspace.windows.first);
+        if (event.keycode == 23 and self.workspace.windows.len >= 1 and (event.state & c.Mod4Mask) != 0) {
+            const direction: i2 = if ((event.state & c.ShiftMask) != 0) -1 else 1;
+
+            if (direction == 1) {
+                if (self.workspace.windows.last.?.data.window == self.workspace.current_focused_window.data.window) {
+                    self.workspace.current_focused_window = @ptrCast(self.workspace.windows.first);
+                } else if (self.workspace.current_focused_window.next == null) {
+                    self.workspace.current_focused_window = @ptrCast(self.workspace.windows.first);
+                } else {
+                    self.workspace.current_focused_window = @ptrCast(self.workspace.current_focused_window.next);
+                }
             } else {
-                self.workspace.current_focused_window = @ptrCast(self.workspace.current_focused_window.next);
+                if (self.workspace.windows.first.?.data.window == self.workspace.current_focused_window.data.window) {
+                    self.workspace.current_focused_window = @ptrCast(self.workspace.windows.last);
+                } else if (self.workspace.current_focused_window.prev == null) {
+                    self.workspace.current_focused_window = @ptrCast(self.workspace.windows.last);
+                } else {
+                    self.workspace.current_focused_window = @ptrCast(self.workspace.current_focused_window.prev);
+                }
             }
 
             _ = c.XRaiseWindow(@constCast(self.x_display), self.workspace.current_focused_window.data.window);
             _ = c.XSetInputFocus(@constCast(self.x_display), self.workspace.current_focused_window.data.window, c.RevertToParent, c.CurrentTime);
             _ = c.XSetWindowBorder(@constCast(self.x_display), self.workspace.current_focused_window.data.window, 0xFFFFFF);
 
-            // This should either be self.workspace.windows.first or self.workspace.current_focused_window
-            // The choice is solely on the design principles and UX of a window manager
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspace.windows.first;
-
             while (ptr) |node| : (ptr = node.next) {
-                if (node.data.window == self.workspace.current_focused_window.data.window) {
-                    continue;
-                } else {
+                if (node.data.window != self.workspace.current_focused_window.data.window) {
                     _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, 0x333333);
                 }
             }
@@ -154,55 +165,35 @@ pub const Layout = struct {
     }
 
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
-        try Logger.Log.info("ZWM_RUN_MAPREQUEST_HANDLEMAPREQUEST", "Mapping Window: {d}", .{event.window});
-
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
 
         // TODO: update this so that the doubly linked list type isnot a window but a struct containing the windows x and y and w and h vals and staccking order
         const window: Window = Window{
             .window = event.window,
+            .modified = false,
         };
-
-        // TODO: handling creation tiling, similar to ragnar
-        // This will be done by mapping a window, and with the `last` of self.workspace.windows.last before the new window is appeneded
-        // travel all the way down using last last last resizing all the windows, one before the initial starting window
-        // because the starting window should take up half the screen before modification and resizing
-
-        // NEVER AUTOMATICALLY MOVE WINDOWS!!! I HATE WINDOW MANAGERS THAT DO THIS!!! THIS IS WHY IS CREATED MY OWN
 
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
         self.workspace.windows.append(node);
 
-        var initial_tiled_window_heights: c_int = 0;
-        if (self.workspace.windows.len <= 2) {
-            initial_tiled_window_heights = 0;
-        } else {
-            initial_tiled_window_heights = @intCast(5 * self.workspace.windows.len);
-        }
-
         if (self.workspace.windows.len >= 2) {
-            // Map the event window
             _ = c.XMapWindow(@constCast(self.x_display), event.window);
             _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
             _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0x333333);
 
-            // Resize the initial window to half, though this should be changed later to check if the initial (half screen) window has been moved
             _ = c.XResizeWindow(@constCast(self.x_display), self.workspace.windows.first.?.data.window, @divFloor(@abs(self.workspace.screen_w - 10), 2), @abs(self.workspace.screen_h - 10));
 
-            // The second window
             _ = c.XMoveWindow(@constCast(self.x_display), self.workspace.windows.first.?.next.?.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), 0);
 
-            // The rest of the windows
-            _ = c.XMoveWindow(@constCast(self.x_display), self.workspace.windows.last.?.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), initial_tiled_window_heights);
-
-            // Iterate through the list of windows starting at the second window
             var start: ?*std.DoublyLinkedList(Window).Node = self.workspace.windows.first.?.next.?;
 
+            // Todo: fix some small details in the width and height
+            // Todo: add mod4 + spacebar to auto till again
+            // Auto tile just makes the currently focused window take up the entire sceren without fullscreening
             var index: u64 = 0;
             while (start) |win| : (start = win.next) {
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), @intCast(@divFloor(@abs(self.workspace.screen_h - 10), (self.workspace.windows.len - 1))));
-                // Move the window beneath the previous
+                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.workspace.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.workspace.screen_h - 10), (self.workspace.windows.len - 1)) - 1 * self.workspace.windows.len)));
 
                 // so much casting :(
                 const height_of_each_window: c_int = @intCast(@divFloor(self.workspace.screen_h, @as(c_int, @intCast((self.workspace.windows.len - 1)))));
@@ -224,25 +215,16 @@ pub const Layout = struct {
     }
 
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
-        try Logger.Log.info("ZWM_RUN_DESTROYNOTIFY_HANDLEDESTROYNOTIFY", "Destroying Window: {d}", .{event.window});
+        const window = self.windowToNode(event.window);
 
-        var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspace.windows.first orelse return;
-
-        var window: ?*std.DoublyLinkedList(Window).Node = null;
-
-        while (ptr) |node| : (ptr = node.next) {
-            if (node.data.window == event.window) {
-                window = node;
-                break;
-            } else continue;
-        }
-
-        try Logger.Log.info("ZWM_RUN_DESTROYNOTIFY_HANDLEDESTROYNOTIFY", "Window List Size: {d}", .{self.workspace.windows.len});
         if (window) |w| {
             self.workspace.windows.remove(w);
             self.allocator.destroy(w);
+
+            if (self.workspace.windows.len >= 1) {
+                self.workspace.current_focused_window = @ptrCast(self.workspace.windows.last);
+            }
         }
-        try Logger.Log.info("ZWM_RUN_DESTROYNOTIFY_HANDLEDESTROYNOTIFY", "Window List Size after destruction: {d}", .{self.workspace.windows.len});
 
         _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
     }
@@ -258,6 +240,8 @@ pub const Layout = struct {
         self.workspace.win_y = attributes.y;
 
         self.workspace.mouse = @constCast(event).*;
+
+        _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
     }
 
     // TODO: raise the window when clicked
@@ -273,6 +257,11 @@ pub const Layout = struct {
 
         const button: c_uint = self.workspace.mouse.button;
 
+        const window = self.windowToNode(event.window);
+        if (window) |w| {
+            w.data.modified = true;
+        }
+
         // TODO: set border width and colour in a config
         // TODO: handle window movement and reisizing when fullscreen is true
         if (button == 1) {
@@ -285,39 +274,17 @@ pub const Layout = struct {
 
             _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, 0xFFFFFF);
             _ = c.XResizeWindow(@constCast(self.x_display), event.subwindow, w_x, w_y);
-        } else {
-            try Logger.Log.info("ZWM_RUN_MOTIONNOTIFY_HANDLEMOTIONNOTIFY", "Logical Comparison did NOT work: {d}", .{button});
-        }
+        } else {}
     }
 
+    // TODO: on hover, raise window
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         // TODO: set border width and colour in a config
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, 0xFFFFFF);
 
         // Traverse the window list and make the node with the data equal to the event.window the current focused
-        var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspace.windows.first;
-
-        var window: ?*std.DoublyLinkedList(Window).Node = null;
-
-        // Two while loops? Goodness Gracious!
-
-        while (ptr) |node| : (ptr = node.next) {
-            if (node.data.window == event.window) {
-                window = node;
-                break;
-            } else continue;
-        }
-
-        while (ptr) |node| : (ptr = node.next) {
-            if (node.next == null) break;
-
-            if (node.data.window == self.workspace.current_focused_window.data.window) {
-                continue;
-            } else {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, 0x333333);
-            }
-        }
+        const window = self.windowToNode(event.window);
 
         self.workspace.current_focused_window = @ptrCast(window);
     }

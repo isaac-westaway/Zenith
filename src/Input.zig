@@ -28,6 +28,7 @@ pub const Input = struct {
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Escape), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
 
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Tab), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Tab), c.Mod4Mask | c.ShiftMask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
 
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_f), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
 
