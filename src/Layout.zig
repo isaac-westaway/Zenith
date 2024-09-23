@@ -6,6 +6,7 @@ const c = @import("x11.zig").c;
 
 const Window = @import("Window.zig").Window;
 const Workspace = @import("Workspace.zig").Workspace;
+const Statusbar = @import("Statusbar.zig").Statusbar;
 
 const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
@@ -13,6 +14,8 @@ const Keys = @import("keys.zig");
 const currently_focused = 0xef9f1c;
 const currently_hovered = 0xf5c577;
 const unfocused = 0x483008;
+
+// TODO: Adjust resizing for border width
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
 
@@ -26,6 +29,7 @@ pub const Layout = struct {
     screen_w: c_int,
     screen_h: c_int,
 
+    statusbar: Statusbar,
     workspaces: std.ArrayList(Workspace),
     current_ws: u32,
 
@@ -80,6 +84,8 @@ pub const Layout = struct {
 
         layout.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
+
+        layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
 
         return layout;
     }
@@ -359,7 +365,11 @@ pub const Layout = struct {
                 _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, unfocused);
             }
         }
+
+        _ = c.XRaiseWindow(@constCast(self.x_display), self.statusbar.x_drawable);
     }
+
+    // TODO: retile unmodified windows here too
 
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
         if (self.workspaces.items[self.current_ws].windows.len == 0) return;
@@ -381,6 +391,8 @@ pub const Layout = struct {
     }
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
+        if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
+
         if (event.subwindow == 0) return;
         var attributes: c.XWindowAttributes = undefined;
         _ = c.XGetWindowAttributes(@constCast(self.x_display), event.subwindow, &attributes);
@@ -414,6 +426,8 @@ pub const Layout = struct {
     }
 
     pub fn handleMotionNotify(self: *Layout, event: *const c.XMotionEvent) !void {
+        if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
+
         const diff_mag_x: c_int = event.x - self.workspaces.items[self.current_ws].mouse.x;
         const diff_mag_y: c_int = event.y - self.workspaces.items[self.current_ws].mouse.y;
 
@@ -459,7 +473,11 @@ pub const Layout = struct {
         }
     }
 
+    // TODO: also re add the 3 colour hover state, idk why I removd it
+    // TODO: all add clicking into the window sets the input focus
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
+        if (event.window == self.statusbar.x_drawable) return;
+
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
 
         const win = self.windowToNode(event.window);
