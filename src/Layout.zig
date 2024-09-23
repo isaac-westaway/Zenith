@@ -21,7 +21,6 @@ const currently_hovered = 0xf5c577;
 const unfocused = 0x483008;
 
 // TODO: Adjust resizing for border width
-// TODO: fix small fullscreen window gap
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
 
@@ -134,7 +133,7 @@ pub const Layout = struct {
 
                     _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
                     _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, 0, 0);
-                    _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @as(c_uint, @intCast(self.screen_w)) - 2, @as(c_uint, @intCast(self.screen_h)) - 2);
+                    _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @as(c_uint, @intCast(self.screen_w)), @as(c_uint, @intCast(self.screen_h)));
 
                     self.workspaces.items[self.current_ws].fs_window = @ptrCast(window);
                 }
