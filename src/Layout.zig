@@ -34,12 +34,10 @@ pub const Layout = struct {
 
         while (ptr) |node| : (ptr = node.next) {
             if (node.data.window == window) {
-                Logger.Log.info("ZWM_RUN_WINTONODE", "Found Window: {d} in workspace: {d}", .{ node.data.window, self.current_ws }) catch {};
                 return node;
             } else continue;
         }
 
-        Logger.Log.err("ZWM_RUN_WINTONODE", "Unable to find window in window list: {d}", .{window}) catch {};
         return null;
     }
 
@@ -86,9 +84,7 @@ pub const Layout = struct {
         return layout;
     }
 
-    // Should be broken into its own functions in actions.zig
     pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
-        // TODO: make this more dynamic, to see keycodes run `xev` in a terminal
         if (event.keycode == 36) {
             Actions.openTerminal(self.allocator);
 
@@ -100,10 +96,9 @@ pub const Layout = struct {
         }
 
         if (event.keycode == 41) {
-            // TODO: set border width and colour in a config
-
             if (self.workspaces.items[self.current_ws].fullscreen == false) {
                 var attributes: c.XWindowAttributes = undefined;
+
                 _ = c.XGetWindowAttributes(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, &attributes);
 
                 const window = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
@@ -116,7 +111,7 @@ pub const Layout = struct {
                     win.data.f_w = @abs(attributes.width);
                     win.data.f_h = @abs(attributes.height);
 
-                    _ = c.XSetWindowBorderWidth(@constCast(self.x_display), win.data.window, 1);
+                    _ = c.XSetWindowBorderWidth(@constCast(self.x_display), win.data.window, 0);
 
                     _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
                     _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, 0, 0);
@@ -131,7 +126,7 @@ pub const Layout = struct {
             }
 
             if (self.workspaces.items[self.current_ws].fullscreen == true) {
-                _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, 5);
+                _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, 3);
 
                 _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, self.workspaces.items[self.current_ws].fs_window.data.f_x, self.workspaces.items[self.current_ws].fs_window.data.f_y);
                 _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, @as(c_uint, @intCast(self.workspaces.items[self.current_ws].fs_window.data.f_w)), @as(c_uint, @intCast(self.workspaces.items[self.current_ws].fs_window.data.f_h)));
@@ -226,20 +221,72 @@ pub const Layout = struct {
         }
 
         if (event.keycode == 24) {
-            _ = c.XDestroyWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window);
+            if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
-            if (self.workspaces.items[self.current_ws].windows.len > 0) {
-                self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(self.workspaces.items[self.current_ws].windows.first);
+            _ = c.XDestroyWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window);
+        }
+
+        if (event.keycode == 33) {
+            if (self.workspaces.items[self.current_ws].windows.len == 0) return;
+
+            const win = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
+
+            var ws: u32 = self.current_ws;
+
+            if (ws == self.workspaces.items.len - 1) {
+                ws = 0;
             } else {
-                self.workspaces.items[self.current_ws].current_focused_window = undefined;
+                ws += 1;
+            }
+
+            if (win) |w| {
+                self.workspaces.items[self.current_ws].windows.remove(w);
+                _ = c.XUnmapWindow(@constCast(self.x_display), w.data.window);
+                self.workspaces.items[ws].windows.prepend(w);
+
+                self.workspaces.items[ws].current_focused_window = w;
+
+                var window = self.workspaces.items[ws].windows.first;
+
+                // Should come up with a better name
+                while (window) |_window| : (window = _window.next) {
+                    if (_window.data.window != self.workspaces.items[ws].current_focused_window.data.window) {
+                        _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, unfocused);
+                    }
+                }
             }
         }
 
-        // TODO: add the ability to cycle currently focused window up or down a workspace
+        if (event.keycode == 32) {
+            if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
-        // TODO: Background images
+            const win = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
 
-        // TODO: move everything else outlines into a configuration and refactor some areas
+            var ws: u32 = self.current_ws;
+
+            if (ws == 0) {
+                ws = @intCast(self.workspaces.items.len - 1);
+            } else {
+                ws -= 1;
+            }
+
+            if (win) |w| {
+                self.workspaces.items[self.current_ws].windows.remove(w);
+
+                _ = c.XUnmapWindow(@constCast(self.x_display), w.data.window);
+                self.workspaces.items[ws].windows.prepend(w);
+
+                self.workspaces.items[ws].current_focused_window = w;
+
+                var window = self.workspaces.items[ws].windows.first;
+
+                while (window) |_window| : (window = _window.next) {
+                    if (_window.data.window != self.workspaces.items[ws].current_focused_window.data.window) {
+                        _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, unfocused);
+                    }
+                }
+            }
+        }
     }
 
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
@@ -248,12 +295,10 @@ pub const Layout = struct {
         try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {d}", .{event.window});
     }
 
-    // TODO: if the window has been modified, in the boolean state, then do not automatically tile when a new window is mapped
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
         try Logger.Log.info("ZWM_RUN_MAPREQUEST", "Handling Map Request", .{});
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
 
-        // TODO: update this so that the doubly linked list type isnot a window but a struct containing the windows x and y and w and h vals and staccking order
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
 
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
@@ -261,19 +306,20 @@ pub const Layout = struct {
         self.workspaces.items[self.current_ws].windows.prepend(node);
 
         // TODO: rework the mapping logic
+        // if the window has been modified, in the boolean state, then do not automatically tile when a new window is mapped
+        // fix some small details in the width and height
+        // add mod4 + spacebar to auto till again
+        // Auto tile just makes the currently focused window take up the entire sceren without fullscreenin
 
         if (self.workspaces.items[self.current_ws].windows.len >= 2) {
             _ = c.XMapWindow(@constCast(self.x_display), event.window);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
+            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 3);
 
             _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, @divFloor(@abs(self.screen_w - 10), 2), @abs(self.screen_h - 10));
             _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, 0, 0);
 
             var start: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first.?.next.?;
 
-            // Todo: fix some small details in the width and height
-            // Todo: add mod4 + spacebar to auto till again
-            // Auto tile just makes the currently focused window take up the entire sceren without fullscreening
             var index: u64 = 0;
             while (start) |win| : (start = win.next) {
                 _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.screen_h - 10), (self.workspaces.items[self.current_ws].windows.len - 1)) - (1 * self.workspaces.items[self.current_ws].windows.len) - 10)));
@@ -286,13 +332,11 @@ pub const Layout = struct {
                 _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
                 index += 1;
             }
-
-            // TODO: set border width and colour in a config
         } else {
             _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.screen_w - 10), @abs(self.screen_h - 10));
 
             _ = c.XMapWindow(@constCast(self.x_display), event.window);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 5);
+            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 3);
         }
 
         var attributes: c.XWindowAttributes = undefined;
@@ -318,8 +362,9 @@ pub const Layout = struct {
     }
 
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
+        if (self.workspaces.items[self.current_ws].windows.len == 0) return;
         try Logger.Log.info("ZWM_RUN_DESTROY", "Recieved destruction event", .{});
-        const window = self.windowToNode(event.window);
+        const window: ?*std.DoublyLinkedList(Window).Node = self.windowToNode(event.window);
 
         if (window) |w| {
             self.workspaces.items[self.current_ws].windows.remove(w);
@@ -327,11 +372,12 @@ pub const Layout = struct {
 
             if (self.workspaces.items[self.current_ws].windows.len >= 1) {
                 self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(self.workspaces.items[self.current_ws].windows.last);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, currently_focused);
+                _ = c.XSetInputFocus(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, c.RevertToParent, c.CurrentTime);
+            } else {
+                _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
             }
         }
-
-        // TODO: handle three colours here too
-        _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
     }
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
@@ -402,7 +448,6 @@ pub const Layout = struct {
 
         _ = c.XRaiseWindow(@constCast(self.x_display), event.window);
 
-        // TODO: handle window movement and reisizing when fullscreen is true
         if (button == 1 and self.workspaces.items[self.current_ws].fullscreen == false) {
             _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, new_x, new_y);
         }
@@ -414,12 +459,20 @@ pub const Layout = struct {
         }
     }
 
-    // TODO: minor change so when enter notify update the w_x and w_y and w_h and w_w attributes incase the mouse is clicked outside and dragged into the window
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
-        // TODO: set border width and colour in a config
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
 
         const win = self.windowToNode(event.window);
+
+        if (self.workspaces.items.len == 1) return;
+
+        var attributes: c.XWindowAttributes = undefined;
+        _ = c.XGetWindowAttributes(@constCast(self.x_display), event.window, &attributes);
+
+        self.workspaces.items[self.current_ws].win_x = attributes.x;
+        self.workspaces.items[self.current_ws].win_y = attributes.y;
+        self.workspaces.items[self.current_ws].win_w = attributes.width;
+        self.workspaces.items[self.current_ws].win_h = attributes.height;
 
         if (win) |w| {
             if (w.data.window != self.workspaces.items[self.current_ws].current_focused_window.data.window) {
@@ -430,6 +483,8 @@ pub const Layout = struct {
 
     pub fn handleLeaveNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         const win = self.windowToNode(event.window);
+
+        if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
         if (win) |w| {
             _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);

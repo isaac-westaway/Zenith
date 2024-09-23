@@ -32,6 +32,8 @@ pub const Input = struct {
 
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_f), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_q), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_p), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_o), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
 
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_d), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_a), c.Mod4Mask, @constCast(input.x_rootwindow).*, 0, c.GrabModeAsync, c.GrabModeAsync);
