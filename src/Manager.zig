@@ -13,8 +13,8 @@ pub const Manager = struct {
     allocator: *std.mem.Allocator,
 
     x_display: *const c.Display,
-    x_rootwindow: *const c.Window,
     x_screen: *c.Screen,
+    x_rootwindow: c.Window,
 
     layout: Layout,
     input: Input,
@@ -26,7 +26,7 @@ pub const Manager = struct {
 
         manager.x_display = c.XOpenDisplay(null) orelse std.posix.exit(1);
         manager.x_screen = c.XDefaultScreenOfDisplay(@constCast(manager.x_display));
-        manager.x_rootwindow = &c.XDefaultRootWindow(@constCast(manager.x_display));
+        manager.x_rootwindow = c.XDefaultRootWindow(@constCast(manager.x_display));
 
         manager.layout = try Layout.init(manager.allocator, manager.x_display, manager.x_rootwindow);
         manager.input = try Input.init(manager.allocator, manager.x_display, manager.x_rootwindow);
@@ -36,7 +36,7 @@ pub const Manager = struct {
         var window_attributes: c.XSetWindowAttributes = undefined;
         window_attributes.event_mask = c.SubstructureRedirectMask | c.SubstructureNotifyMask;
 
-        _ = c.XSelectInput(@constCast(manager.x_display), @constCast(manager.x_rootwindow).*, window_attributes.event_mask);
+        _ = c.XSelectInput(@constCast(manager.x_display), manager.x_rootwindow, window_attributes.event_mask);
 
         try Logger.Log.info("ZWM_INIT", "Successfully Initialized the Window Manager", .{});
 

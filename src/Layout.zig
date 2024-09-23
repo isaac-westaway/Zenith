@@ -2,11 +2,16 @@ const std = @import("std");
 
 const Logger = @import("zlog");
 
+// Should fix this up
+const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
 
 const Window = @import("Window.zig").Window;
 const Workspace = @import("Workspace.zig").Workspace;
 const Statusbar = @import("Statusbar.zig").Statusbar;
+
+const A = @import("Atoms.zig");
+const Atoms = @import("Atoms.zig").Atoms;
 
 const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
@@ -16,6 +21,7 @@ const currently_hovered = 0xf5c577;
 const unfocused = 0x483008;
 
 // TODO: Adjust resizing for border width
+// TODO: fix small fullscreen window gap
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
 
@@ -23,8 +29,8 @@ pub const Layout = struct {
     allocator: *std.mem.Allocator,
 
     x_display: *const c.Display,
-    x_rootwindow: *const c.Window,
     x_screen: *const c.Screen,
+    x_rootwindow: c.Window,
 
     screen_w: c_int,
     screen_h: c_int,
@@ -32,6 +38,8 @@ pub const Layout = struct {
     statusbar: Statusbar,
     workspaces: std.ArrayList(Workspace),
     current_ws: u32,
+
+    atoms: Atoms,
 
     fn windowToNode(self: *const Layout, window: c.Window) ?*std.DoublyLinkedList(Window).Node {
         var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
@@ -45,7 +53,7 @@ pub const Layout = struct {
         return null;
     }
 
-    pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: *const c.Window) !Layout {
+    pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: c.Window) !Layout {
         var layout: Layout = undefined;
 
         layout.allocator = allocator;
@@ -85,7 +93,12 @@ pub const Layout = struct {
         layout.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
 
-        layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
+        layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, &layout.x_rootwindow, layout.x_screen);
+        layout.atoms = try Atoms.init(layout.allocator, layout.x_display, &layout.x_rootwindow);
+        layout.atoms.updateNormalHints();
+
+        x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_number_of_desktops, c.XA_CARDINAL, layout.workspaces.items.len);
+        x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, layout.current_ws);
 
         return layout;
     }
@@ -204,6 +217,8 @@ pub const Layout = struct {
                     }
                 }
             }
+
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
 
         if (event.keycode == 38) {
@@ -224,6 +239,8 @@ pub const Layout = struct {
             while (windows) |node| : (windows = node.prev) {
                 _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
             }
+
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
 
         if (event.keycode == 24) {
@@ -302,7 +319,6 @@ pub const Layout = struct {
     }
 
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
-        try Logger.Log.info("ZWM_RUN_MAPREQUEST", "Handling Map Request", .{});
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
 
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
@@ -310,6 +326,18 @@ pub const Layout = struct {
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
         self.workspaces.items[self.current_ws].windows.prepend(node);
+
+        // TODO: Fix this atom param
+        // _ = c.XChangeProperty(
+        //     @constCast(self.x_display),
+        //     @constCast(self.x_rootwindow).*,
+        //     A.net_client_list,
+        //     c.XA_WINDOW,
+        //     32,
+        //     c.PropModeAppend,
+        //     @ptrCast(&node.data.window),
+        //     1,
+        // );
 
         // TODO: rework the mapping logic
         // if the window has been modified, in the boolean state, then do not automatically tile when a new window is mapped
@@ -473,7 +501,6 @@ pub const Layout = struct {
         }
     }
 
-    // TODO: also re add the 3 colour hover state, idk why I removd it
     // TODO: all add clicking into the window sets the input focus
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         if (event.window == self.statusbar.x_drawable) return;
