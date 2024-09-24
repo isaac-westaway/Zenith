@@ -88,6 +88,10 @@ pub const Manager = struct {
                     try self.layout.handleLeaveNotify(&event.xcrossing);
                 },
 
+                c.FocusIn => {
+                    try Logger.Log.info("ZWM_RUN", "Focus In Event", .{});
+                },
+
                 else => {},
             }
         }

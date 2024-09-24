@@ -108,6 +108,7 @@ pub const Layout = struct {
 
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_number_of_desktops, c.XA_CARDINAL, layout.workspaces.items.len);
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, layout.current_ws);
+        x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_active_window, c.XA_WINDOW, layout.x_rootwindow);
 
         layout.background = try Background.init(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
 
@@ -170,6 +171,14 @@ pub const Layout = struct {
             }
 
             try self.workspaces.items[self.current_ws].focusOneUnfocusAll();
+
+            x11.setWindowPropertyScalar(
+                @constCast(self.x_display),
+                self.x_rootwindow,
+                A.net_active_window,
+                c.XA_WINDOW,
+                self.workspaces.items[self.current_ws].current_focused_window.data.window,
+            );
 
             return;
         }
@@ -305,25 +314,15 @@ pub const Layout = struct {
 
     // TODO: Fix the mapping logic, kind of flawed and unmaintainable and gross
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
-        _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
+        _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
+
+        _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask | c.FocusChangeMask);
 
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
 
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
         self.workspaces.items[self.current_ws].windows.prepend(node);
-
-        // TODO: Fix this atom param
-        // _ = c.XChangeProperty(
-        //     @constCast(self.x_display),
-        //     @constCast(self.x_rootwindow).*,
-        //     A.net_client_list,
-        //     c.XA_WINDOW,
-        //     32,
-        //     c.PropModeAppend,
-        //     @ptrCast(&node.data.window),
-        //     1,
-        // );
 
         // TODO: rework the mapping logic
         // if the window has been modified, in the boolean state, then do not automatically tile when a new window is mapped
@@ -380,6 +379,7 @@ pub const Layout = struct {
             }
         }
 
+        _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
         _ = c.XRaiseWindow(@constCast(self.x_display), self.statusbar.x_drawable);
         _ = c.XChangeProperty(
             @constCast(self.x_display),
@@ -392,11 +392,13 @@ pub const Layout = struct {
             1,
         );
 
-        x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.window);
+        _ = c.XChangeProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, 32, c.PropModeReplace, @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window), 1);
     }
 
     // TODO: retile unmodified windows here too
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
+        _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
+
         if (event.window == self.background.background) return;
 
         if (self.workspaces.items[self.current_ws].windows.len == 0) return;
