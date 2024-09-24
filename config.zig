@@ -1,3 +1,6 @@
+///
+/// Once you are done editing this file, run `zig build` to rebuild the project
+///
 /// The window that is currently focused
 pub const hard_focused: comptime_int = 0xef9f1c;
 
@@ -15,7 +18,7 @@ pub const border_width: comptime_int = 2;
 
 /// The absolute path to the background, leave blank if you do NOT want a background
 /// Begins at "/"
-pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex.jpg";
+pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg";
 
 /// The terminal command, for example "kitty" or "alacritty" or "xterm"
 pub const terminal_cmd: []const u8 = "kitty";

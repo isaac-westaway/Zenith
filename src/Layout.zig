@@ -27,6 +27,8 @@ const unfocused = Config.unfocused;
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
 
+// TODO: fix layout fullscreen mod4+f when there are no windows
+
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
 // Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height

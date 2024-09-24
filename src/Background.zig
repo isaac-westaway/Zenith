@@ -41,13 +41,20 @@ pub const Background = struct {
         Imlib.imlib_context_set_colormap(c.DefaultColormap(dp, scr));
 
         const image: Imlib.Imlib_Image = Imlib.imlib_load_image(@ptrCast(Config.background_path));
-
         Imlib.imlib_context_set_image(image);
+
+        const src_width: c_int = Imlib.imlib_image_get_width();
+        const src_height: c_int = Imlib.imlib_image_get_height();
+        const dst_width: c_int = 1920;
+        const dst_height: c_int = 1080;
+
+        const scaled_image: Imlib.Imlib_Image = Imlib.imlib_create_cropped_scaled_image(0, 0, src_width, src_height, dst_width, dst_height);
+        Imlib.imlib_context_set_image(scaled_image);
 
         const pixmap = c.XCreatePixmap(@constCast(background.x_display), window, 1920, 1080, @as(c_uint, @intCast(c.DefaultDepth(@constCast(background.x_display), scr))));
 
-        Imlib2.imlib_context_set_drawable(pixmap);
-        Imlib2.imlib_render_image_on_drawable(0, 0);
+        Imlib.imlib_context_set_drawable(pixmap);
+        Imlib.imlib_render_image_on_drawable(0, 0);
 
         _ = c.XSetWindowBackgroundPixmap(@constCast(background.x_display), window, pixmap);
         _ = c.XClearWindow(@constCast(background.x_display), window);
