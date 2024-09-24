@@ -1,6 +1,6 @@
 // A Banner or Logo
 
-![Screenshot](./image/screenshot1.png)
+![Screenshot](./image/screenshot2.png)
 
 Overview
 =======
@@ -88,7 +88,7 @@ Currently supported atoms
 - `_NET_NUMBER_OF_DESKTOPS`
 - `_NET_CURRENT_DESKTOP`
 - `_NET_CLIENT_LIST`
-- `_NET_ACTIVE_WINDOW`***
+- `_NET_ACTIVE_WINDOW`
 
 Contributing
 ============
