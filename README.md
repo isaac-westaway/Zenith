@@ -41,11 +41,20 @@ Building
 --------
 
 ```
-git clone [THIS REPOSITORY]
+git clone https://github.com/isaac-westaway/Zenith
 
 cd zenith
 
-make install
+make all
+```
+
+Installation
+------------
+
+Your `~/.xinitrc` should look as follow:
+
+```
+exec Zenith
 ```
 
 Configuration
@@ -65,6 +74,8 @@ Todo
 
 - Continue EMWH & ICCM spec integration
 - More todos specified in `Layout.zig` and `config.zig`
+- Installation Script
+- XSession config file
 
 Contributing
 ============
