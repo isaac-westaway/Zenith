@@ -20,6 +20,8 @@ Ability to define a number of workspaces in the `config.zig`, and dynamically cr
 
 Optional integration with picom, though support for picom is ongoing as to become compliant with EWMH and ICCM
 
+3 Color hovering, focused and unfocused system
+
 Getting Started
 ===============
 
@@ -80,7 +82,6 @@ Bug fixes & Updates
 - More todos specified in `Layout.zig` and `config.zig`
 - Installation Script
 - XSession config file
-- Picom is unable to determine the _NET_ACTIVE_WINDOW to set active opacity & inactive opacity***
 
 Currently supported atoms
 -------------------------
