@@ -1,6 +1,10 @@
 ///
 /// Once you are done editing this file, run `zig build` to rebuild the project
 ///
+/// The command to be executed when running picom, if you would like to run picom, if not leave it as: ""
+/// A comma separated slice of picom command line arguments, add more as you please
+pub const picom_command = &[_][]const u8{ "picom", "--config", "/home/isaacwestaway/picom.conf" };
+
 /// The window that is currently focused
 pub const hard_focused: comptime_int = 0xef9f1c;
 

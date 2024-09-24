@@ -35,6 +35,7 @@ const unfocused = Config.unfocused;
 // Ideas: add the ability to create a terminal pad without any particular resizing or modification, just a small scratchpad near the cursor
 // -- then you could press mod4+Spsace to tile the workspace
 // Also add the ability to hide the cursor
+// Iideas: command to hide the border
 
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
@@ -114,6 +115,11 @@ pub const Layout = struct {
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, layout.current_ws);
 
         layout.background = try Background.init(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
+
+        // Begin picom process, if applicable
+        var process = std.process.Child.init(Config.picom_command, allocator.*);
+
+        process.spawn() catch {};
 
         return layout;
     }
