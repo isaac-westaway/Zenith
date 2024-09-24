@@ -42,6 +42,10 @@ pub const Input = struct {
 
         _ = c.XGrabButton(@constCast(input.x_display), 3, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | c.Button3Mask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
 
+        _ = c.XGrabButton(@constCast(input.x_display), 1, c.NoEventMask, input.x_rootwindow, 0, c.ButtonPress | c.Button1MotionMask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
+
+        _ = c.XGrabButton(@constCast(input.x_display), 3, c.NoEventMask, input.x_rootwindow, 0, c.ButtonPress | c.Button3Mask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
+
         return input;
     }
 };

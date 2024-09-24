@@ -24,6 +24,13 @@ const unfocused = 0x483008;
 
 // TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
 
+// Ideas: add the ability to control window x and y position using mod4+Arrow Keys
+// Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
+// Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height
+// Ideas: add the ability to create a terminal pad without any particular resizing or modification, just a small scratchpad near the cursor
+// -- then you could press mod4+Spsace to tile the workspace
+// Also add the ability to hide the cursor
+
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
 
@@ -317,6 +324,7 @@ pub const Layout = struct {
         try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {d}", .{event.window});
     }
 
+    // TODO: Fix the mapping logic, kind of flawed and unmaintainable and gross
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask);
 
@@ -397,7 +405,6 @@ pub const Layout = struct {
     }
 
     // TODO: retile unmodified windows here too
-
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
         if (self.workspaces.items[self.current_ws].windows.len == 0) return;
         try Logger.Log.info("ZWM_RUN_DESTROY", "Recieved destruction event", .{});
