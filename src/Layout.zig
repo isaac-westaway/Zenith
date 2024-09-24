@@ -29,6 +29,8 @@ const unfocused = Config.unfocused;
 
 // TODO: fix layout fullscreen mod4+f when there are no windows
 
+// TODO: update _NET_CLIENT_FOCUSED for picom support and EWMH
+
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
 // Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height
@@ -86,24 +88,14 @@ pub const Layout = struct {
             try layout.workspaces.append(workspace);
         }
 
-        layout.current_ws = 0;
-        for (layout.workspaces.items) |*workspace| {
-            workspace.* = Workspace{
-                .x_display = layout.x_display,
-                .windows = std.DoublyLinkedList(Window){},
-                .fullscreen = false,
-                .fs_window = undefined,
-                .current_focused_window = undefined,
-                .mouse = undefined,
-                .win_x = 0,
-                .win_y = 0,
-                .win_w = 0,
-                .win_h = 0,
-            };
-        }
-
         layout.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
+
+        layout.current_ws = 0;
+        for (layout.workspaces.items) |*workspace| {
+            // Why is the auto formatter like this :(
+            workspace.* = Workspace{ .x_display = layout.x_display, .x_rootwindow = layout.x_rootwindow, .windows = std.DoublyLinkedList(Window){}, .fullscreen = false, .fs_window = undefined, .current_focused_window = undefined, .mouse = undefined, .win_x = 0, .win_y = 0, .win_w = 0, .win_h = 0, .screen_w = layout.screen_w, .screen_h = layout.screen_h };
+        }
 
         if (Config.enable_statusbar) {
             layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, &layout.x_rootwindow, layout.x_screen);
@@ -111,6 +103,8 @@ pub const Layout = struct {
 
         layout.atoms = try Atoms.init(layout.allocator, layout.x_display, &layout.x_rootwindow);
         layout.atoms.updateNormalHints();
+
+        _ = c.XDeleteProperty(@constCast(layout.x_display), layout.x_rootwindow, A.net_client_list);
 
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_number_of_desktops, c.XA_CARDINAL, layout.workspaces.items.len);
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, layout.current_ws);
@@ -387,6 +381,18 @@ pub const Layout = struct {
         }
 
         _ = c.XRaiseWindow(@constCast(self.x_display), self.statusbar.x_drawable);
+        _ = c.XChangeProperty(
+            @constCast(self.x_display),
+            self.x_rootwindow,
+            A.net_client_list,
+            c.XA_WINDOW,
+            32,
+            c.PropModeAppend,
+            @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window),
+            1,
+        );
+
+        x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.window);
     }
 
     // TODO: retile unmodified windows here too
@@ -451,6 +457,8 @@ pub const Layout = struct {
                 _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, unfocused);
             }
         }
+
+        x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.subwindow);
     }
 
     pub fn handleMotionNotify(self: *Layout, event: *const c.XMotionEvent) !void {
@@ -500,6 +508,8 @@ pub const Layout = struct {
 
             _ = c.XResizeWindow(@constCast(self.x_display), event.subwindow, w_x, w_y);
         }
+
+        x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.subwindow);
     }
 
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {

@@ -2,9 +2,12 @@ const std = @import("std");
 
 const Logger = @import("zlog");
 
+const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
 
 const Window = @import("Window.zig").Window;
+
+const Atoms = @import("Atoms.zig");
 
 const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
@@ -13,6 +16,7 @@ const Config = @import("config");
 
 pub const Workspace = struct {
     x_display: *const c.Display,
+    x_rootwindow: c.Window,
 
     windows: std.DoublyLinkedList(Window),
     current_focused_window: *std.DoublyLinkedList(Window).Node,
@@ -28,6 +32,9 @@ pub const Workspace = struct {
     win_y: i32,
     win_w: i32,
     win_h: i32,
+
+    screen_w: i32,
+    screen_h: i32,
 
     fn windowToNode(self: *const Workspace, window: c.Window) ?*std.DoublyLinkedList(Window).Node {
         var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
@@ -89,6 +96,8 @@ pub const Workspace = struct {
         _ = c.XSetWindowBorder(@constCast(self.x_display), self.current_focused_window.data.window, Config.hard_focused);
 
         _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToNone, c.CurrentTime);
+
+        x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, Atoms.net_active_window, c.XA_WINDOW, self.current_focused_window.data.window);
 
         var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
         while (ptr) |node| : (ptr = node.next) {
