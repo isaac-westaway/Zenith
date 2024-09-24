@@ -1,6 +1,6 @@
 // A Banner or Logo
 
-![Screenshot](./image/screenshot.png)
+![Screenshot](./image/screenshot1.png)
 
 Overview
 =======
