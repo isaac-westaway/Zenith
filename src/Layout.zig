@@ -23,13 +23,7 @@ const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
 
-// TODO: Adjust resizing for border width
-
-// TODO: investigate the "unable to find window" errors in windowToNode, especially regarding windows and subwindows
-
 // TODO: fix layout fullscreen mod4+f when there are no windows
-
-// TODO: update _NET_CLIENT_FOCUSED for picom support and EWMH
 
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
