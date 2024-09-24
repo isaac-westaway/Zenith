@@ -74,10 +74,20 @@ Keybinds
 Todo
 ====
 
+Bug fixes & Updates
+-------------------
 - Continue EMWH & ICCM spec integration
 - More todos specified in `Layout.zig` and `config.zig`
 - Installation Script
 - XSession config file
+
+Currently supported atoms
+-------------------------
+
+- `_NET_NUMBER_OF_DESKTOPS`
+- `_NET_CURRENT_DESKTOP`
+- `_NET_CLIENT_LIST`
+- `_NET_ACTIVE_WINDOW`
 
 Contributing
 ============

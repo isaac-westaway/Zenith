@@ -415,6 +415,22 @@ pub const Layout = struct {
                 _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
             }
         }
+
+        _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_client_list);
+
+        var it = self.workspaces.items[self.current_ws].windows.first;
+        while (it) |n| : (it = n.next) {
+            _ = c.XChangeProperty(
+                @constCast(self.x_display),
+                self.x_rootwindow,
+                A.net_client_list,
+                c.XA_WINDOW,
+                32,
+                c.PropModeAppend,
+                @ptrCast(&n.data.window),
+                1,
+            );
+        }
     }
 
     // TODO: all add clicking into the window sets the input focus
