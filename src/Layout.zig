@@ -89,6 +89,7 @@ pub const Layout = struct {
         layout.current_ws = 0;
         for (layout.workspaces.items) |*workspace| {
             workspace.* = Workspace{
+                .x_display = layout.x_display,
                 .windows = std.DoublyLinkedList(Window){},
                 .fullscreen = false,
                 .fs_window = undefined,
@@ -125,64 +126,32 @@ pub const Layout = struct {
     }
 
     pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
+
+        // Open the Kitty (or what is defined in config.zig) terminal
         if (event.keycode == 36) {
             Actions.openTerminal(self.allocator);
 
             return;
         }
 
-        if (event.keycode == 21) {
+        // Mod4 + lowercase(l)
+        // Scrot is a package to take screenshots
+        if (event.keycode == 46) {
             Actions.scrot(self.allocator);
-
-            return;
         }
 
+        // Kill the Window Manager
         if (event.keycode == 9) {
             try Logger.Log.fatal("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Closing Window Manager", .{});
         }
 
+        // Handle the fullscreening
+        // TODO: this needs some small fixes, especially when a user opens another window (ctrl+enter to open a terminal) whilst in the fullscreen state
         if (event.keycode == 41) {
-            if (self.workspaces.items[self.current_ws].fullscreen == false) {
-                var attributes: c.XWindowAttributes = undefined;
-
-                _ = c.XGetWindowAttributes(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, &attributes);
-
-                const window = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
-
-                if (window) |win| {
-                    win.data.f_x = attributes.x;
-                    win.data.f_y = attributes.y;
-
-                    // Why is it possible that the width and height of the window be negative????
-                    win.data.f_w = @abs(attributes.width);
-                    win.data.f_h = @abs(attributes.height);
-
-                    // Border width is zero as it is fullscreen
-                    _ = c.XSetWindowBorderWidth(@constCast(self.x_display), win.data.window, 0);
-
-                    _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
-                    _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, 0, 0);
-                    _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @as(c_uint, @intCast(self.screen_w)), @as(c_uint, @intCast(self.screen_h)));
-
-                    self.workspaces.items[self.current_ws].fs_window = @ptrCast(window);
-                }
-
-                self.workspaces.items[self.current_ws].fullscreen = true;
-
-                return;
-            }
-
-            if (self.workspaces.items[self.current_ws].fullscreen == true) {
-                _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, Config.border_width);
-
-                _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, self.workspaces.items[self.current_ws].fs_window.data.f_x, self.workspaces.items[self.current_ws].fs_window.data.f_y);
-                _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, @as(c_uint, @intCast(self.workspaces.items[self.current_ws].fs_window.data.f_w)), @as(c_uint, @intCast(self.workspaces.items[self.current_ws].fs_window.data.f_h)));
-                self.workspaces.items[self.current_ws].fullscreen = false;
-
-                return;
-            }
+            try self.workspaces.items[self.current_ws].handleFullscreen();
         }
 
+        // Tab list focusing
         if (event.keycode == 23 and self.workspaces.items[self.current_ws].windows.len >= 1 and (event.state & c.Mod4Mask) != 0) {
             const direction: i2 = if ((event.state & c.ShiftMask) != 0) -1 else 1;
 
@@ -206,20 +175,12 @@ pub const Layout = struct {
                 }
             }
 
-            _ = c.XRaiseWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window);
-            _ = c.XSetInputFocus(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, c.RevertToParent, c.CurrentTime);
-            _ = c.XSetWindowBorder(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, currently_focused);
-
-            var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
-            while (ptr) |node| : (ptr = node.next) {
-                if (node.data.window != self.workspaces.items[self.current_ws].current_focused_window.data.window) {
-                    _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, unfocused);
-                }
-            }
+            try self.workspaces.items[self.current_ws].focusOneUnfocusAll();
 
             return;
         }
 
+        // Move right a workspace
         if (event.keycode == 40) {
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
 
@@ -249,6 +210,7 @@ pub const Layout = struct {
             x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
 
+        // Move left a workspace
         if (event.keycode == 38) {
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
 
@@ -271,12 +233,12 @@ pub const Layout = struct {
             x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
 
+        // Close the currently focused window
         if (event.keycode == 24) {
-            if (self.workspaces.items[self.current_ws].windows.len == 0) return;
-
-            _ = c.XDestroyWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window);
+            try self.workspaces.items[self.current_ws].closeFocusedWindow();
         }
 
+        // Push a window right in a workspace
         if (event.keycode == 33) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
@@ -308,6 +270,7 @@ pub const Layout = struct {
             }
         }
 
+        // Push a window left in a workspace
         if (event.keycode == 32) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
@@ -448,6 +411,11 @@ pub const Layout = struct {
         }
     }
 
+    // TODO: all add clicking into the window sets the input focus
+
+    // There is a bug where right clicking will unset the focus of the window
+    // However pressing Mod4+Clicking into the window seems to slightly fix it
+    // Could be fixed by continuing EWMH & ICCM support
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
         if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
         if (event.subwindow == self.background.background) return;
@@ -465,6 +433,7 @@ pub const Layout = struct {
 
         _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, currently_focused);
+        _ = c.XSetInputFocus(@constCast(self.x_display), event.subwindow, c.RevertToParent, c.CurrentTime);
 
         const window = self.windowToNode(event.subwindow);
 
@@ -533,7 +502,6 @@ pub const Layout = struct {
         }
     }
 
-    // TODO: all add clicking into the window sets the input focus
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         if (event.window == self.statusbar.x_drawable) return;
 
