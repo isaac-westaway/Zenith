@@ -12,6 +12,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const src_module = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "./config.zig" },
+    });
+    exe.root_module.addImport("config", src_module);
+
     exe.linkLibC();
     exe.linkSystemLibrary("Imlib2");
     exe.linkSystemLibrary("X11");

@@ -17,9 +17,11 @@ const Atoms = @import("Atoms.zig").Atoms;
 const Actions = @import("actions.zig");
 const Keys = @import("keys.zig");
 
-const currently_focused = 0xef9f1c;
-const currently_hovered = 0xf5c577;
-const unfocused = 0x483008;
+const Config = @import("config");
+
+const currently_focused = Config.hard_focused;
+const currently_hovered = Config.soft_focused;
+const unfocused = Config.unfocused;
 
 // TODO: Adjust resizing for border width
 
@@ -71,11 +73,9 @@ pub const Layout = struct {
 
         const screen = c.DefaultScreen(@constCast(layout.x_display));
 
-        const initial_number_of_workspaces: comptime_int = 5;
-
         layout.workspaces = std.ArrayList(Workspace).init(layout.allocator.*);
 
-        for (0..initial_number_of_workspaces) |index| {
+        for (0..Config.inital_number_of_workspaces) |index| {
             _ = index;
 
             const workspace: Workspace = undefined;
@@ -101,7 +101,10 @@ pub const Layout = struct {
         layout.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
 
-        // layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, &layout.x_rootwindow, layout.x_screen);
+        if (Config.enable_statusbar) {
+            layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, &layout.x_rootwindow, layout.x_screen);
+        }
+
         layout.atoms = try Atoms.init(layout.allocator, layout.x_display, &layout.x_rootwindow);
         layout.atoms.updateNormalHints();
 
@@ -140,6 +143,7 @@ pub const Layout = struct {
                     win.data.f_w = @abs(attributes.width);
                     win.data.f_h = @abs(attributes.height);
 
+                    // Border width is zero as it is fullscreen
                     _ = c.XSetWindowBorderWidth(@constCast(self.x_display), win.data.window, 0);
 
                     _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
@@ -155,7 +159,7 @@ pub const Layout = struct {
             }
 
             if (self.workspaces.items[self.current_ws].fullscreen == true) {
-                _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, 3);
+                _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, Config.border_width);
 
                 _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, self.workspaces.items[self.current_ws].fs_window.data.f_x, self.workspaces.items[self.current_ws].fs_window.data.f_y);
                 _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].fs_window.data.window, @as(c_uint, @intCast(self.workspaces.items[self.current_ws].fs_window.data.f_w)), @as(c_uint, @intCast(self.workspaces.items[self.current_ws].fs_window.data.f_h)));
@@ -358,7 +362,7 @@ pub const Layout = struct {
 
         if (self.workspaces.items[self.current_ws].windows.len >= 2) {
             _ = c.XMapWindow(@constCast(self.x_display), event.window);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 3);
+            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, Config.border_width);
 
             _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, @divFloor(@abs(self.screen_w - 10), 2), @abs(self.screen_h - 10));
             _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, 0, 0);
@@ -381,7 +385,7 @@ pub const Layout = struct {
             _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.screen_w - 10), @abs(self.screen_h - 10));
 
             _ = c.XMapWindow(@constCast(self.x_display), event.window);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, 3);
+            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, Config.border_width);
         }
 
         var attributes: c.XWindowAttributes = undefined;
@@ -410,6 +414,8 @@ pub const Layout = struct {
 
     // TODO: retile unmodified windows here too
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
+        if (event.window == self.background.background) return;
+
         if (self.workspaces.items[self.current_ws].windows.len == 0) return;
         try Logger.Log.info("ZWM_RUN_DESTROY", "Recieved destruction event", .{});
         const window: ?*std.DoublyLinkedList(Window).Node = self.windowToNode(event.window);
@@ -430,6 +436,7 @@ pub const Layout = struct {
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
         if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
+        if (event.subwindow == self.background.background) return;
 
         if (event.subwindow == 0) return;
         var attributes: c.XWindowAttributes = undefined;
@@ -464,7 +471,8 @@ pub const Layout = struct {
     }
 
     pub fn handleMotionNotify(self: *Layout, event: *const c.XMotionEvent) !void {
-        if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
+        if (event.subwindow == self.statusbar.x_drawable) return;
+        if (event.subwindow == self.background.background) return;
 
         const diff_mag_x: c_int = event.x - self.workspaces.items[self.current_ws].mouse.x;
         const diff_mag_y: c_int = event.y - self.workspaces.items[self.current_ws].mouse.y;

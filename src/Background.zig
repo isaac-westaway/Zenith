@@ -9,6 +9,8 @@ const Imlib2 = @cImport({
 });
 const Imlib = Imlib2;
 
+const Config = @import("config");
+
 pub const Background = struct {
     allocator: *std.mem.Allocator,
 
@@ -16,8 +18,10 @@ pub const Background = struct {
     x_rootwindow: c.Window,
     x_screen: *const c.Screen,
 
+    background: c.Window,
+
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, rootwindow: c.Window, screen: *const c.Screen) !Background {
-        const background: Background = Background{ .allocator = allocator, .x_display = display, .x_rootwindow = rootwindow, .x_screen = screen };
+        var background: Background = Background{ .allocator = allocator, .x_display = display, .x_rootwindow = rootwindow, .x_screen = screen, .background = undefined };
 
         const scr = c.DefaultScreen(@constCast(background.x_display));
 
@@ -36,7 +40,7 @@ pub const Background = struct {
         Imlib.imlib_context_set_visual(@ptrCast(c.DefaultVisual(dp, scr)));
         Imlib.imlib_context_set_colormap(c.DefaultColormap(dp, scr));
 
-        const image: Imlib.Imlib_Image = Imlib.imlib_load_image("/home/isaacwestaway/Documents/zig/zwm/image/spacex.jpg");
+        const image: Imlib.Imlib_Image = Imlib.imlib_load_image(@ptrCast(Config.background_path));
 
         Imlib.imlib_context_set_image(image);
 
@@ -48,6 +52,8 @@ pub const Background = struct {
         _ = c.XSetWindowBackgroundPixmap(@constCast(background.x_display), window, pixmap);
         _ = c.XClearWindow(@constCast(background.x_display), window);
         _ = c.XFlush(@constCast(background.x_display));
+
+        background.background = window;
 
         return background;
     }
