@@ -131,6 +131,12 @@ pub const Layout = struct {
             return;
         }
 
+        if (event.keycode == 21) {
+            Actions.scrot(self.allocator);
+
+            return;
+        }
+
         if (event.keycode == 9) {
             try Logger.Log.fatal("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Closing Window Manager", .{});
         }
