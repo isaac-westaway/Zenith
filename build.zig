@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.linkLibC();
+    exe.linkSystemLibrary("Imlib2");
     exe.linkSystemLibrary("X11");
     exe.linkSystemLibrary("Xinerama");
 

@@ -9,6 +9,7 @@ const c = @import("x11.zig").c;
 const Window = @import("Window.zig").Window;
 const Workspace = @import("Workspace.zig").Workspace;
 const Statusbar = @import("Statusbar.zig").Statusbar;
+const Background = @import("Background.zig").Background;
 
 const A = @import("Atoms.zig");
 const Atoms = @import("Atoms.zig").Atoms;
@@ -42,6 +43,7 @@ pub const Layout = struct {
     screen_h: c_int,
 
     statusbar: Statusbar,
+    background: Background,
     workspaces: std.ArrayList(Workspace),
     current_ws: u32,
 
@@ -99,12 +101,14 @@ pub const Layout = struct {
         layout.screen_w = @intCast(c.XDisplayWidth(@constCast(display), screen));
         layout.screen_h = @intCast(c.XDisplayHeight(@constCast(display), screen));
 
-        layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, &layout.x_rootwindow, layout.x_screen);
+        // layout.statusbar = try Statusbar.init(layout.allocator, layout.x_display, &layout.x_rootwindow, layout.x_screen);
         layout.atoms = try Atoms.init(layout.allocator, layout.x_display, &layout.x_rootwindow);
         layout.atoms.updateNormalHints();
 
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_number_of_desktops, c.XA_CARDINAL, layout.workspaces.items.len);
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, layout.current_ws);
+
+        layout.background = try Background.init(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
 
         return layout;
     }
