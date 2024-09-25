@@ -68,6 +68,7 @@ Keybinds
 --------
 
 Taking a screenshot requires the `scrot` package to be installed
+
 Every key alphabetic key you see is in lowercase
 
 | To be Documented | Keybind |
@@ -98,6 +99,7 @@ Bug fixes & Updates
 - XSession config file
 - Multiple monitor support -> this is planned, I just don't have another screen to work with
 - Wayland Support
+- Write a tutorial in the project Wiki on how to set an animated background
 
 Currently supported atoms
 -------------------------
