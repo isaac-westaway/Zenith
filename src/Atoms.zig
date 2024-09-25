@@ -4,8 +4,6 @@ const c = @import("x11.zig").c;
 
 const Utils = @import("utils.zig");
 
-// TODO: change this so it is contained inside the struct
-
 pub var zenith_main_factor: c.Atom = undefined;
 pub var utf8_string: c.Atom = undefined;
 pub var wm_protocols: c.Atom = undefined;

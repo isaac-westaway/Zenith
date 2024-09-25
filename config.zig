@@ -31,14 +31,14 @@ pub const number_of_images: comptime_int = 39;
 pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg";
 
 /// The window that is currently focused
-pub const hard_focused: comptime_int = 0xef9f1c;
+pub const hard_focused: comptime_int = 0xf44728;
 
 /// The window that is being hovered over
 /// Set this to zero, or the unfocused or the hard focused if you do not want three-color behaviour
-pub const soft_focused: comptime_int = 0xf5c577;
+pub const soft_focused: comptime_int = 0xeee78d;
 
 /// The window that is unfocused
-pub const unfocused: comptime_int = 0x483008;
+pub const unfocused: comptime_int = 0x5a3e40;
 
 /// The width of the border
 /// Set this to zero if you do not want a border at all

@@ -1,6 +1,5 @@
 const std = @import("std");
 
-// Should fix this up
 const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
 
@@ -20,8 +19,6 @@ const Config = @import("config");
 const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
-
-// TODO: add a keybind to unfocus the window manager
 
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)

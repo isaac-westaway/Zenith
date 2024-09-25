@@ -13,6 +13,8 @@ const Imlib = Imlib2;
 
 const Config = @import("config");
 
+// Yes i acknowledge the code here is pretty bad, dpy, display, 10^3 variables with the same use
+
 pub const Background = struct {
     allocator: *std.mem.Allocator,
 
@@ -43,7 +45,6 @@ pub const Background = struct {
 
         const window_attributes = c.XSetWindowAttributes{ .override_redirect = 1, .background_pixel = 0xFFFFFFFF };
 
-        // TODO: make the background setting dynamically sized to the monitor
         const window = c.XCreateSimpleWindow(@constCast(background.x_display), background.x_rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, whitepixel);
         _ = c.XMapWindow(@constCast(background.x_display), window);
 
@@ -120,8 +121,6 @@ pub const Background = struct {
         return background;
     }
 
-    /// To be executed on a separate thread
-    /// Works well, good performance, though room for improvement by using an SDL2 texture
     pub fn animateBackground(allocator: *std.mem.Allocator, display: *const c.Display, window: c.Window, rootwindow: c.Window) void {
         _ = rootwindow;
         const scr = c.DefaultScreen(@constCast(display));

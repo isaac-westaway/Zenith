@@ -22,6 +22,9 @@ Optional integration with picom, though support for picom is ongoing as to becom
 
 3 Color hovering, focused and unfocused system
 
+Complete support for an animated background, using a `gif`. You need `imagemagick` installed to coalesce the gif into a series of frames, though
+`magick example.gif -coalesce out.bmp`
+
 Getting Started
 ===============
 
@@ -100,6 +103,7 @@ Bug fixes & Updates
 - Multiple monitor support -> this is planned, I just don't have another screen to work with
 - Wayland Support
 - Write a tutorial in the project Wiki on how to set an animated background
+- Could probably modify the Animated Background to remove the need for imagemagick and automatically convert a gif to a series of images
 
 Currently supported atoms
 -------------------------

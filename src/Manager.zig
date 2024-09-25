@@ -36,8 +36,6 @@ pub const Manager = struct {
 
         _ = c.XSelectInput(@constCast(manager.x_display), manager.x_rootwindow, window_attributes.event_mask);
 
-        // try Logger.Log.info("ZWM_INIT", "Successfully Initialized the Window Manager", .{});
-
         _ = c.XSync(@constCast(manager.x_display), 0);
 
         return manager;

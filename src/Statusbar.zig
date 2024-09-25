@@ -30,7 +30,6 @@ pub const Statusbar = struct {
         const x_start: c_int = @intCast(c.XDisplayWidth(@constCast(dpy), scr) - 50);
         const y_start = 0;
 
-        // WHY CAN THE SCREEN WIDTH BE NEGATIVE???
         const x_end: c_uint = @intCast(c.XDisplayWidth(@constCast(dpy), scr));
         const y_end = 20;
         const border = 3;
