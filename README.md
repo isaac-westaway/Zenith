@@ -76,10 +76,11 @@ Todo
 
 Bug fixes & Updates
 -------------------
-- Continue EMWH & ICCM spec integration
 - More todos specified in `Layout.zig` and `config.zig`
 - Installation Script
 - XSession config file
+- Multiple monitor support -> this is planned, I just don't have another screen to work with
+- Wayland Support
 
 Currently supported atoms
 -------------------------

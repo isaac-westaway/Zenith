@@ -21,6 +21,8 @@ const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
 
+// TODO: add a keybind to unfocus the window manager
+
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
 // Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height
@@ -208,6 +210,8 @@ pub const Layout = struct {
                 }
             }
 
+            try self.workspaces.items[self.current_ws].focusOneUnfocusAll();
+
             x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
 
@@ -230,6 +234,8 @@ pub const Layout = struct {
             while (windows) |node| : (windows = node.prev) {
                 _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
             }
+
+            try self.workspaces.items[self.current_ws].focusOneUnfocusAll();
 
             x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }

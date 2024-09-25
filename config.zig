@@ -1,5 +1,5 @@
 ///
-/// Once you are done editing this file, run `zig build` to rebuild the project
+/// Once you are done editing this file, run `make all` to rebuild the project
 ///
 /// The command to be executed when running picom, if you would like to run picom, if not leave it as: ""
 /// A comma separated slice of picom command line arguments, add more as you please
@@ -10,7 +10,7 @@ pub const picom_command = &[_][]const u8{ "picom", "--config", "/home/isaacwesta
 /// To automatically generate these images, use imagemagick and run `magick`
 /// the images must be in the naming format
 /// This example has the images using the filename out-{n}.bmp
-pub const animated_background: bool = false;
+pub const animated_background: bool = true;
 pub const image_directory: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/orange/";
 pub const image_file_name: []const u8 = "out";
 pub const image_file_extension: []const u8 = "bmp";

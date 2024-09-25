@@ -69,6 +69,8 @@ pub const Workspace = struct {
                 _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, 0, 0);
                 _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @as(c_uint, @intCast(self.screen_w)), @as(c_uint, @intCast(self.screen_h)));
 
+                _ = c.XSetInputFocus(@constCast(self.x_display), win.data.window, c.RevertToPointerRoot, c.CurrentTime);
+
                 self.fs_window = @ptrCast(window);
             }
 
@@ -82,6 +84,9 @@ pub const Workspace = struct {
 
             _ = c.XMoveWindow(@constCast(self.x_display), self.fs_window.data.window, self.fs_window.data.f_x, self.fs_window.data.f_y);
             _ = c.XResizeWindow(@constCast(self.x_display), self.fs_window.data.window, @as(c_uint, @intCast(self.fs_window.data.f_w)), @as(c_uint, @intCast(self.fs_window.data.f_h)));
+
+            _ = c.XSetInputFocus(@constCast(self.x_display), self.fs_window.data.window, c.RevertToPointerRoot, c.CurrentTime);
+
             self.fullscreen = false;
 
             return;
@@ -89,20 +94,22 @@ pub const Workspace = struct {
     }
 
     pub fn focusOneUnfocusAll(self: *Workspace) !void {
-        _ = c.XRaiseWindow(@constCast(self.x_display), self.current_focused_window.data.window);
-        _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToParent, c.CurrentTime);
-        _ = c.XSetWindowBorder(@constCast(self.x_display), self.current_focused_window.data.window, Config.hard_focused);
+        if (self.windows.len > 0) {
+            _ = c.XRaiseWindow(@constCast(self.x_display), self.current_focused_window.data.window);
+            _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToPointerRoot, c.CurrentTime);
+            _ = c.XSetWindowBorder(@constCast(self.x_display), self.current_focused_window.data.window, Config.hard_focused);
 
-        _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToNone, c.CurrentTime);
+            _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToPointerRoot, c.CurrentTime);
 
-        x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, Atoms.net_active_window, c.XA_WINDOW, self.current_focused_window.data.window);
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, Atoms.net_active_window, c.XA_WINDOW, self.current_focused_window.data.window);
 
-        var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
-        while (ptr) |node| : (ptr = node.next) {
-            if (node.data.window != self.current_focused_window.data.window) {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, Config.unfocused);
+            var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
+            while (ptr) |node| : (ptr = node.next) {
+                if (node.data.window != self.current_focused_window.data.window) {
+                    _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, Config.unfocused);
+                }
             }
-        }
+        } else return;
     }
 
     pub fn closeFocusedWindow(self: *Workspace) !void {

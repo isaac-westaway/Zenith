@@ -38,9 +38,22 @@ pub const Background = struct {
         const blackpixel = c.XBlackPixel(@constCast(dpy), scr);
         const whitepixel = c.XWhitePixel(@constCast(dpy), scr);
 
-        const window = c.XCreateSimpleWindow(@constCast(background.x_display), background.x_rootwindow, 0, 0, 1920, 1080, 0, blackpixel, whitepixel);
+        const screen_width: c_uint = @intCast(c.XDisplayWidth(@constCast(display), scr));
+        const screen_height: c_uint = @intCast(c.XDisplayHeight(@constCast(display), scr));
 
+        const window_attributes = c.XSetWindowAttributes{ .override_redirect = 1, .background_pixel = 0xFFFFFFFF };
+
+        // TODO: make the background setting dynamically sized to the monitor
+        const window = c.XCreateSimpleWindow(@constCast(background.x_display), background.x_rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, whitepixel);
         _ = c.XMapWindow(@constCast(background.x_display), window);
+
+        _ = c.XConfigureWindow(@constCast(background.x_display), window, c.CWOverrideRedirect, @ptrCast(@constCast(&window_attributes)));
+
+        const opacity_atom: c.Atom = c.XInternAtom(@constCast(background.x_display), "_NET_WM_WINDOW_OPACITY", c.False);
+
+        const opacity: c_uint = 0xFFFFFFFF;
+
+        _ = c.XChangeProperty(@constCast(background.x_display), window, opacity_atom, c.XA_CARDINAL, 32, c.PropModeReplace, @ptrCast(&opacity), 1);
 
         const dp: ?*c.Display = @constCast(background.x_display);
 
@@ -52,15 +65,16 @@ pub const Background = struct {
         const image: Imlib.Imlib_Image = Imlib.imlib_load_image(@ptrCast(Config.background_path));
         Imlib.imlib_context_set_image(image);
 
+        // TODO: make the background setting dynamically sized to the monitor
         const src_width: c_int = Imlib.imlib_image_get_width();
         const src_height: c_int = Imlib.imlib_image_get_height();
-        const dst_width: c_int = 1920;
-        const dst_height: c_int = 1080;
+        const dst_width: c_int = @intCast(screen_width);
+        const dst_height: c_int = @intCast(screen_height);
 
         const scaled_image: Imlib.Imlib_Image = Imlib.imlib_create_cropped_scaled_image(0, 0, src_width, src_height, dst_width, dst_height);
         Imlib.imlib_context_set_image(scaled_image);
 
-        const pixmap = c.XCreatePixmap(@constCast(background.x_display), window, 1920, 1080, @as(c_uint, @intCast(c.DefaultDepth(@constCast(background.x_display), scr))));
+        const pixmap = c.XCreatePixmap(@constCast(background.x_display), window, screen_width, screen_height, @as(c_uint, @intCast(c.DefaultDepth(@constCast(background.x_display), scr))));
 
         Imlib.imlib_context_set_drawable(pixmap);
         Imlib.imlib_render_image_on_drawable(0, 0);
@@ -90,7 +104,16 @@ pub const Background = struct {
         const blackpixel = c.XBlackPixel(@constCast(dpy), scr);
         const whitepixel = c.XWhitePixel(@constCast(dpy), scr);
 
-        const window = c.XCreateSimpleWindow(@constCast(display), rootwindow, 0, 0, 1920, 1080, 0, blackpixel, whitepixel);
+        const screen_width: c_uint = @intCast(c.XDisplayWidth(@constCast(display), scr));
+        const screen_height: c_uint = @intCast(c.XDisplayHeight(@constCast(display), scr));
+
+        const window = c.XCreateSimpleWindow(@constCast(display), rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, whitepixel);
+
+        const opacity_atom: c.Atom = c.XInternAtom(@constCast(background.x_display), "_NET_WM_WINDOW_OPACITY", c.False);
+
+        const opacity: c_uint = 0xFFFFFFFF;
+
+        _ = c.XChangeProperty(@constCast(background.x_display), window, opacity_atom, c.XA_CARDINAL, 32, c.PropModeReplace, @ptrCast(&opacity), 1);
 
         background.background = window;
 
@@ -109,7 +132,12 @@ pub const Background = struct {
         Imlib.imlib_context_set_visual(@ptrCast(c.DefaultVisual(dp, scr)));
         Imlib.imlib_context_set_colormap(c.DefaultColormap(dp, scr));
 
-        const pixmap = c.XCreatePixmap(@constCast(display), window, 1920, 1080, @as(c_uint, @intCast(c.DefaultDepth(@constCast(display), scr))));
+        const screen = c.DefaultScreen(@constCast(display));
+
+        const screen_width: c_uint = @intCast(c.XDisplayWidth(@constCast(display), screen));
+        const screen_height: c_uint = @intCast(c.XDisplayHeight(@constCast(display), screen));
+
+        const pixmap = c.XCreatePixmap(@constCast(display), window, screen_width, screen_height, @as(c_uint, @intCast(c.DefaultDepth(@constCast(display), scr))));
         Imlib.imlib_context_set_drawable(pixmap);
 
         var timeout: c.timespec = undefined;
@@ -127,8 +155,8 @@ pub const Background = struct {
         }
 
         var scaled_images: [Config.number_of_images]Imlib.Imlib_Image = undefined;
-        const dst_width: c_int = 1920;
-        const dst_height: c_int = 1080;
+        const dst_width: c_int = @intCast(screen_width);
+        const dst_height: c_int = @intCast(screen_height);
 
         for (0..Config.number_of_images) |index| {
             Imlib.imlib_context_set_image(images[index]);
