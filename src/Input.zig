@@ -2,6 +2,8 @@ const std = @import("std");
 
 const c = @import("x11.zig").c;
 
+const Config = @import("config");
+
 /// Is this struct even necessary?
 pub const Input = struct {
     allocator: *std.mem.Allocator,
@@ -21,26 +23,29 @@ pub const Input = struct {
 
         _ = c.XUngrabKey(@constCast(input.x_display), c.AnyKey, c.AnyModifier, input.x_rootwindow);
 
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Return), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.terminal_key), Config.terminal_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Escape), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.close_key), Config.close_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Tab), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_Tab), c.Mod4Mask | c.ShiftMask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.cycle_forward_key), Config.cycle_forward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.cycle_forward_key), Config.cycle_forward_super | Config.cycle_backward_super_second, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_l), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.scrot_key), Config.scrot_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_f), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_q), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_p), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_o), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.fullscreen_key), Config.fullscreen_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.close_window_key), Config.close_window_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.push_forward_key), Config.push_forward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.push_backward_key), Config.push_backward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_d), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
-        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), c.XK_a), c.Mod4Mask, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.workspace_cycle_forward_key), Config.workspace_cycle_forward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.workspace_cycle_backward_key), Config.workspace_cycle_backward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabButton(@constCast(input.x_display), 1, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | c.Button1MotionMask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
+        // " ` " aka tilde aka grave aka backtick
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.unfocus_key), Config.unfocus_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
-        _ = c.XGrabButton(@constCast(input.x_display), 3, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | c.Button3Mask | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
+        _ = c.XGrabButton(@constCast(input.x_display), Config.mouse_button_left, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | Config.mouse_motion_left | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
+
+        _ = c.XGrabButton(@constCast(input.x_display), Config.mouse_button_right, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | Config.mouse_motion_right | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
 
         return input;
     }

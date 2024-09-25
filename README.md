@@ -67,9 +67,26 @@ Configuration is documented in `config.zig`
 Keybinds
 --------
 
+Taking a screenshot requires the `scrot` package to be installed
+Every key alphabetic key you see is in lowercase
+
 | To be Documented | Keybind |
 | ---------------- | ------- |
-| Open Terminal    | Mod4 + Enter |
+| Open Terminal    | Mod4 + Return (Enter) |
+| Close Window Manager | Mod4 + Escape |
+| Tab cycle focus forward | Mod4 + Tab |
+| Tab cycle focus reverse | Mod4 + Shift + Tab |
+| Take a screenshot | Mod4 + l |
+| Toggle fullscreen| Mod4 + f |
+| Close currently focused window | Mod4 + q |
+| Push currently focused window forward a workspace | Mod4 + p |
+| Push currently ... reverse one | Mod4 + o |
+| Cycle right a workspace | Mod4 + d |
+| Cycle left a workspace | Mod4 + a |
+| Unfocus current window (for picom aesthetics) | Mod4 + grave |
+| Move Window | Mod4 + Click and drag left mouse button |
+| Resize Window | Mod4 + Click and drag right mouse button |
+
 
 Todo
 ====

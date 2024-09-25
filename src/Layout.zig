@@ -123,7 +123,7 @@ pub const Layout = struct {
     pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
 
         // Open the Kitty (or what is defined in config.zig) terminal
-        if (event.keycode == 36) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.terminal_key) {
             Actions.openTerminal(self.allocator);
 
             return;
@@ -131,24 +131,39 @@ pub const Layout = struct {
 
         // Mod4 + lowercase(l)
         // Scrot is a package to take screenshots
-        if (event.keycode == 46) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.scrot_key) {
             Actions.scrot(self.allocator);
         }
 
+        // Tilde, Grave, Backtick
+        // Unfocus window, if you want to have a window open but stare at the wallpaper with a blank expression on your face
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.unfocus_key) {
+            x11.setWindowPropertyScalar(
+                @constCast(self.x_display),
+                self.x_rootwindow,
+                A.net_active_window,
+                c.XA_WINDOW,
+                @abs(c.None),
+            );
+        }
+
         // Kill the Window Manager
-        if (event.keycode == 9) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.close_key) {
             std.posix.exit(1);
         }
 
         // Handle the fullscreening
         // TODO: this needs some small fixes, especially when a user opens another window (ctrl+enter to open a terminal) whilst in the fullscreen state
-        if (event.keycode == 41) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.fullscreen_key) {
             try self.workspaces.items[self.current_ws].handleFullscreen();
         }
 
         // Tab list focusing
-        if (event.keycode == 23 and self.workspaces.items[self.current_ws].windows.len >= 1 and (event.state & c.Mod4Mask) != 0) {
-            const direction: i2 = if ((event.state & c.ShiftMask) != 0) -1 else 1;
+        const cycle_keysym = c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0);
+
+        // Check if the keycode matches the 'open terminal' key and other conditions are met
+        if (cycle_keysym == Config.cycle_forward_key and self.workspaces.items[self.current_ws].windows.len >= 1 and (event.state & Config.cycle_forward_super) != 0) {
+            const direction: i2 = if ((event.state & Config.cycle_backward_super_second) != 0) -1 else 1;
 
             if (direction == 1) {
                 if (self.workspaces.items[self.current_ws].windows.last.?.data.window == self.workspaces.items[self.current_ws].current_focused_window.data.window) {
@@ -184,7 +199,7 @@ pub const Layout = struct {
         }
 
         // Move right a workspace
-        if (event.keycode == 40) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.workspace_cycle_forward_key) {
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
 
             while (ptr) |node| : (ptr = node.next) {
@@ -216,7 +231,7 @@ pub const Layout = struct {
         }
 
         // Move left a workspace
-        if (event.keycode == 38) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.workspace_cycle_backward_key) {
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
 
             while (ptr) |node| : (ptr = node.next) {
@@ -241,12 +256,12 @@ pub const Layout = struct {
         }
 
         // Close the currently focused window
-        if (event.keycode == 24) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.close_window_key) {
             try self.workspaces.items[self.current_ws].closeFocusedWindow();
         }
 
         // Push a window right in a workspace
-        if (event.keycode == 33) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.push_forward_key) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
             const win = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
@@ -278,7 +293,7 @@ pub const Layout = struct {
         }
 
         // Push a window left in a workspace
-        if (event.keycode == 32) {
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.push_backward_key) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
 
             const win = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
@@ -438,8 +453,6 @@ pub const Layout = struct {
             );
         }
     }
-
-    // TODO: all add clicking into the window sets the input focus
 
     // There is a bug where right clicking will unset the focus of the window
     // However pressing Mod4+Clicking into the window seems to slightly fix it
