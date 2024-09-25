@@ -38,7 +38,7 @@ pub const Manager = struct {
 
         _ = c.XSelectInput(@constCast(manager.x_display), manager.x_rootwindow, window_attributes.event_mask);
 
-        try Logger.Log.info("ZWM_INIT", "Successfully Initialized the Window Manager", .{});
+        // try Logger.Log.info("ZWM_INIT", "Successfully Initialized the Window Manager", .{});
 
         _ = c.XSync(@constCast(manager.x_display), 0);
 
@@ -46,7 +46,7 @@ pub const Manager = struct {
     }
 
     pub fn run(self: *Manager) !void {
-        try Logger.Log.info("ZWM_RUN", "Running the window manager", .{});
+        // try Logger.Log.info("ZWM_RUN", "Running the window manager", .{});
         while (true) {
             var event: c.XEvent = undefined;
             _ = c.XNextEvent(@constCast(self.x_display), &event);
@@ -61,7 +61,7 @@ pub const Manager = struct {
                 },
 
                 c.PointerMotionMask => {
-                    try Logger.Log.info("ZWM_RUN", "Pointer Motion Event: {any}", .{event.xmotion});
+                    // try Logger.Log.info("ZWM_RUN", "Pointer Motion Event: {any}", .{event.xmotion});
                 },
 
                 c.MotionNotify => {
@@ -89,7 +89,7 @@ pub const Manager = struct {
                 },
 
                 c.FocusIn => {
-                    try Logger.Log.info("ZWM_RUN", "Focus In Event", .{});
+                    // try Logger.Log.info("ZWM_RUN", "Focus In Event", .{});
                 },
 
                 else => {},
@@ -101,27 +101,27 @@ pub const Manager = struct {
         const evt: *c.XErrorEvent = @ptrCast(event);
         switch (evt.error_code) {
             c.BadMatch => {
-                _ = Logger.Log.err("ZWM_RUN", "BadMatch", .{}) catch {
-                    return undefined;
-                };
+                // _ = Logger.Log.err("ZWM_RUN", "BadMatch", .{}) catch {
+                //     return undefined;
+                // };
                 return 0;
             },
             c.BadWindow => {
-                _ = Logger.Log.err("ZWM_RUN", "BadWindow: {any}", .{event.*}) catch {
-                    return undefined;
-                };
+                // _ = Logger.Log.err("ZWM_RUN", "BadWindow: {any}", .{event.*}) catch {
+                //     return undefined;
+                // };
                 return 0;
             },
             c.BadDrawable => {
-                _ = Logger.Log.err("ZWM_RUN", "BadDrawable", .{}) catch {
-                    return undefined;
-                };
+                // _ = Logger.Log.err("ZWM_RUN", "BadDrawable", .{}) catch {
+                //     return undefined;
+                // };
                 return 0;
             },
             else => {
-                _ = Logger.Log.err("ZWM_RUN", "Unhandled Error", .{}) catch {
-                    return undefined;
-                };
+                // _ = Logger.Log.err("ZWM_RUN", "Unhandled Error", .{}) catch {
+                //     return undefined;
+                // };
             },
         }
 

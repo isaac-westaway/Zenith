@@ -5,6 +5,22 @@
 /// A comma separated slice of picom command line arguments, add more as you please
 pub const picom_command = &[_][]const u8{ "picom", "--config", "/home/isaacwestaway/picom.conf" };
 
+/// Animated Background
+/// List of images to use for the animated background
+/// To automatically generate these images, use imagemagick and run `magick`
+/// the images must be in the naming format
+/// This example has the images using the filename out-{n}.bmp
+pub const animated_background: bool = true;
+pub const image_directory: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/orange/";
+pub const image_file_name: []const u8 = "out";
+pub const image_file_extension: []const u8 = "bmp";
+/// Excluding zero, so for 0-22 images would be 22
+pub const number_of_images: comptime_int = 39;
+
+/// The absolute path to the background, leave blank if you do NOT want a background
+/// Begins at "/"
+pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg";
+
 /// The window that is currently focused
 pub const hard_focused: comptime_int = 0xef9f1c;
 
@@ -19,10 +35,6 @@ pub const unfocused: comptime_int = 0x483008;
 /// Set this to zero if you do not want a border at all
 /// Setting a window to fullscreen will set the border width to zero, and this is intended because why do you want a border in fullscreen?
 pub const border_width: comptime_int = 2;
-
-/// The absolute path to the background, leave blank if you do NOT want a background
-/// Begins at "/"
-pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg";
 
 /// The terminal command, for example "kitty" or "alacritty" or "xterm"
 pub const terminal_cmd: []const u8 = "kitty";

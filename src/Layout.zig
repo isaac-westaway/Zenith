@@ -23,7 +23,7 @@ const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
 
-// TODO: fix layout fullscreen mod4+f when there are no windows
+// TODO, tablist sets focusing
 
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
@@ -104,7 +104,15 @@ pub const Layout = struct {
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, layout.current_ws);
         x11.setWindowPropertyScalar(@constCast(layout.x_display), layout.x_rootwindow, A.net_active_window, c.XA_WINDOW, layout.x_rootwindow);
 
-        layout.background = try Background.init(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
+        if (Config.animated_background == false) {
+            layout.background = try Background.init(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
+        } else {
+            layout.background = try Background.animateWindow(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
+
+            const thread = try std.Thread.spawn(.{ .allocator = allocator.* }, Background.animateBackground, .{ allocator, layout.x_display, layout.background.background, layout.x_rootwindow });
+
+            thread.detach();
+        }
 
         // Begin picom process, if applicable
         var process = std.process.Child.init(Config.picom_command, allocator.*);
@@ -308,9 +316,14 @@ pub const Layout = struct {
 
     // TODO: Fix the mapping logic, kind of flawed and unmaintainable and gross
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
+        // The background window will be the very first window that is mapped
         _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
 
-        _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask | c.FocusChangeMask);
+        if (event.window != self.background.background) {
+            _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask | c.FocusChangeMask);
+        } else {
+            _ = c.XSelectInput(@constCast(self.x_display), event.window, c.NoEventMask);
+        }
 
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
 

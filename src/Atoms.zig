@@ -27,6 +27,7 @@ pub var net_current_desktop: c.Atom = undefined;
 pub var net_active_window: c.Atom = undefined;
 pub var net_client_list: c.Atom = undefined;
 pub var net_supporting_wm_check: c.Atom = undefined;
+pub var net_wm_window_opacity: c.Atom = undefined;
 
 pub const Atoms = struct {
     allocator: *std.mem.Allocator,
@@ -71,23 +72,9 @@ pub const Atoms = struct {
         net_active_window = c.XInternAtom(@constCast(display), "_NET_ACTIVE_WINDOW", 0);
         net_client_list = c.XInternAtom(@constCast(display), "_NET_CLIENT_LIST", 0);
         net_supporting_wm_check = c.XInternAtom(@constCast(display), "_NET_SUPPORTING_WM_CHECK", 0);
+        net_wm_window_opacity = c.XInternAtom(@constCast(display), "_NET_WM_WINDOW_OPACITY", 0);
 
-        const supported_net_atoms = [_]c.Atom{
-            net_supported,
-            net_wm_strut,
-            net_wm_strut_partial,
-            net_wm_window_type,
-            net_wm_window_type_dock,
-            net_wm_window_type_dialog,
-            net_wm_state,
-            net_wm_state_fullscreen,
-            net_wm_desktop,
-            net_number_of_desktops,
-            net_current_desktop,
-            net_active_window,
-            net_client_list,
-            net_supporting_wm_check,
-        };
+        const supported_net_atoms = [_]c.Atom{ net_supported, net_wm_strut, net_wm_strut_partial, net_wm_window_type, net_wm_window_type_dock, net_wm_window_type_dialog, net_wm_state, net_wm_state_fullscreen, net_wm_desktop, net_number_of_desktops, net_current_desktop, net_active_window, net_client_list, net_supporting_wm_check, net_wm_window_opacity };
         _ = c.XChangeProperty(
             @constCast(atoms.x_display),
             c.XDefaultRootWindow(@constCast(atoms.x_display)),
