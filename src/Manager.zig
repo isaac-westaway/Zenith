@@ -2,8 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const root = @import("root");
 
-const Logger = @import("zlog");
-
 const c = @import("x11.zig").c;
 
 const Layout = @import("Layout.zig").Layout;

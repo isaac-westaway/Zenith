@@ -22,8 +22,8 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("X11");
     exe.linkSystemLibrary("Xinerama");
 
-    const zlog = b.dependency("zlog", .{ .target = target, .optimize = optimize });
-    exe.root_module.addImport("zlog", zlog.module("zlog"));
+    // const zlog = b.dependency("zlog", .{ .target = target, .optimize = optimize });
+    // exe.root_module.addImport("zlog", zlog.module("zlog"));
 
     b.installArtifact(exe);
 

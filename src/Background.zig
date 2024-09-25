@@ -12,7 +12,6 @@ const Imlib2 = @cImport({
 const Imlib = Imlib2;
 
 const Config = @import("config");
-const Logger = @import("zlog");
 
 pub const Background = struct {
     allocator: *std.mem.Allocator,

@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Logger = @import("zlog");
-
 const c = @import("x11.zig").c;
 
 pub const Statusbar = struct {

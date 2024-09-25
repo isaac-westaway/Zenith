@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Logger = @import("zlog");
-
 // Should fix this up
 const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
@@ -22,8 +20,6 @@ const Config = @import("config");
 const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
-
-// TODO, tablist sets focusing
 
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
@@ -139,7 +135,7 @@ pub const Layout = struct {
 
         // Kill the Window Manager
         if (event.keycode == 9) {
-            try Logger.Log.fatal("ZWM_RUN_KEYPRESSED_RESOLVEKEYINPUT", "Closing Window Manager", .{});
+            std.posix.exit(1);
         }
 
         // Handle the fullscreening
@@ -310,8 +306,7 @@ pub const Layout = struct {
 
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
         _ = self;
-
-        try Logger.Log.info("ZWM_RUN_CREATENOTIFY_HANDLECREATENOTIFY", "Handling Create Notification: {d}", .{event.window});
+        _ = event;
     }
 
     // TODO: Fix the mapping logic, kind of flawed and unmaintainable and gross
@@ -319,11 +314,7 @@ pub const Layout = struct {
         // The background window will be the very first window that is mapped
         _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
 
-        if (event.window != self.background.background) {
-            _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask | c.FocusChangeMask);
-        } else {
-            _ = c.XSelectInput(@constCast(self.x_display), event.window, c.NoEventMask);
-        }
+        _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask | c.FocusChangeMask);
 
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
 
@@ -348,15 +339,17 @@ pub const Layout = struct {
 
             var index: u64 = 0;
             while (start) |win| : (start = win.next) {
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.screen_h - 10), (self.workspaces.items[self.current_ws].windows.len - 1)) - (1 * self.workspaces.items[self.current_ws].windows.len) - 10)));
+                if (win.data.modified == false) {
+                    _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.screen_h - 10), (self.workspaces.items[self.current_ws].windows.len - 1)) - (1 * self.workspaces.items[self.current_ws].windows.len) - 10)));
 
-                // so much casting :(
-                const height_of_each_window: c_int = @intCast(@divFloor(self.screen_h, @as(c_int, @intCast((self.workspaces.items[self.current_ws].windows.len - 1)))));
+                    // so much casting :(
+                    const height_of_each_window: c_int = @intCast(@divFloor(self.screen_h, @as(c_int, @intCast((self.workspaces.items[self.current_ws].windows.len - 1)))));
 
-                // This could be done by updating the `Window` type to store all of its parameters
-                _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(self.screen_w, 2) + 10), @intCast(((height_of_each_window) * @as(c_int, @intCast(index)))));
-                _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
-                index += 1;
+                    // This could be done by updating the `Window` type to store all of its parameters
+                    _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(self.screen_w, 2) + 10), @intCast(((height_of_each_window) * @as(c_int, @intCast(index)))));
+                    _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
+                    index += 1;
+                }
             }
         } else {
             _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.screen_w - 10), @abs(self.screen_h - 10));
@@ -398,7 +391,6 @@ pub const Layout = struct {
             @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window),
             1,
         );
-
         _ = c.XChangeProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, 32, c.PropModeReplace, @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window), 1);
     }
 
@@ -409,7 +401,6 @@ pub const Layout = struct {
         if (event.window == self.background.background) return;
 
         if (self.workspaces.items[self.current_ws].windows.len == 0) return;
-        try Logger.Log.info("ZWM_RUN_DESTROY", "Recieved destruction event", .{});
         const window: ?*std.DoublyLinkedList(Window).Node = self.windowToNode(event.window);
 
         if (window) |w| {

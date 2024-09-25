@@ -37,8 +37,6 @@ imlib2
 x11
 xinerama
 xft
-
-zlog (optional, can be found in my repositories)
 ```
 
 Building

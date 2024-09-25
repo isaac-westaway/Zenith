@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Logger = @import("zlog");
-
 const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
 
