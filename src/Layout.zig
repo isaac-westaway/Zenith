@@ -293,7 +293,29 @@ pub const Layout = struct {
                         _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, unfocused);
                     }
                 }
+
+                if (w.data.modified == false) {
+                    if (self.workspaces.items[ws].windows.len - self.workspaces.items[ws].numberOfWindowsModified().number > 1) {
+                        self.workspaces.items[ws].retileAllWindows();
+                    } else if (self.workspaces.items[ws].windows.len - self.workspaces.items[ws].numberOfWindowsModified().number == 1) {
+                        const unmodified_window = self.workspaces.items[ws].numberOfWindowsModified().last_unmodified;
+
+                        _ = c.XResizeWindow(@constCast(self.x_display), unmodified_window.data.window, @abs(self.screen_w) - (2 * Config.window_gap_width), @abs(self.screen_h) - (2 * Config.window_gap_width));
+
+                        _ = c.XMoveWindow(@constCast(self.x_display), unmodified_window.data.window, Config.window_gap_width, Config.window_gap_width);
+                    } else {}
+                }
             }
+
+            if (self.workspaces.items[self.current_ws].windows.len - self.workspaces.items[self.current_ws].numberOfWindowsModified().number > 1) {
+                self.workspaces.items[self.current_ws].retileAllWindows();
+            } else if (self.workspaces.items[self.current_ws].windows.len - self.workspaces.items[self.current_ws].numberOfWindowsModified().number == 1) {
+                const unmodified_window = self.workspaces.items[self.current_ws].numberOfWindowsModified().last_unmodified;
+
+                _ = c.XResizeWindow(@constCast(self.x_display), unmodified_window.data.window, @abs(self.screen_w) - (2 * Config.window_gap_width), @abs(self.screen_h) - (2 * Config.window_gap_width));
+
+                _ = c.XMoveWindow(@constCast(self.x_display), unmodified_window.data.window, Config.window_gap_width, Config.window_gap_width);
+            } else {}
         }
 
         // Push a window left in a workspace
@@ -326,7 +348,29 @@ pub const Layout = struct {
                         _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, unfocused);
                     }
                 }
+
+                if (w.data.modified == false) {
+                    if (self.workspaces.items[ws].windows.len - self.workspaces.items[ws].numberOfWindowsModified().number > 1) {
+                        self.workspaces.items[ws].retileAllWindows();
+                    } else if (self.workspaces.items[ws].windows.len - self.workspaces.items[ws].numberOfWindowsModified().number == 1) {
+                        const unmodified_window = self.workspaces.items[ws].numberOfWindowsModified().last_unmodified;
+
+                        _ = c.XResizeWindow(@constCast(self.x_display), unmodified_window.data.window, @abs(self.screen_w) - (2 * Config.window_gap_width), @abs(self.screen_h) - (2 * Config.window_gap_width));
+
+                        _ = c.XMoveWindow(@constCast(self.x_display), unmodified_window.data.window, Config.window_gap_width, Config.window_gap_width);
+                    } else {}
+                }
             }
+
+            if (self.workspaces.items[self.current_ws].windows.len - self.workspaces.items[self.current_ws].numberOfWindowsModified().number > 1) {
+                self.workspaces.items[self.current_ws].retileAllWindows();
+            } else if (self.workspaces.items[self.current_ws].windows.len - self.workspaces.items[self.current_ws].numberOfWindowsModified().number == 1) {
+                const unmodified_window = self.workspaces.items[self.current_ws].numberOfWindowsModified().last_unmodified;
+
+                _ = c.XResizeWindow(@constCast(self.x_display), unmodified_window.data.window, @abs(self.screen_w) - (2 * Config.window_gap_width), @abs(self.screen_h) - (2 * Config.window_gap_width));
+
+                _ = c.XMoveWindow(@constCast(self.x_display), unmodified_window.data.window, Config.window_gap_width, Config.window_gap_width);
+            } else {}
         }
 
         // Dynamically append another workspace to the list of workspaces

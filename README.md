@@ -91,7 +91,7 @@ Every key alphabetic key you see is in lowercase
 | Move Window | Mod4 + Click and drag left mouse button |
 | Resize Window | Mod4 + Click and drag right mouse button |
 | Add a workspace (dynamically) to the end | Mod4 + equals |
-| Remove a workspace (dynamically) at the end | Mo4 + minus |
+| Remove a workspace (dynamically) at the end | Mod4 + minus |
 
 
 Todo

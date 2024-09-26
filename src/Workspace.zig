@@ -221,7 +221,10 @@ pub const Workspace = struct {
             self.retileAllWindows();
         }
     }
-};
 
-// TODO: auto tile function using Mod4 + Space, this could work by checking the last window, which should take up the first half of the screen
-// If this window has a modified attribute, and is focused, and is the last window, then it should be moved to the 0,0 width half and height full
+    pub fn swapLeftRightMaster() !void {}
+    pub fn addWindowAsMaster() !void {}
+    pub fn addWindowAsSlave() !void {}
+    pub fn swapVerticalHorizontalTiling() !void {}
+    pub fn swapAboveBelowTiling() !void {}
+};
