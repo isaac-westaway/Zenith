@@ -12,7 +12,6 @@ const A = @import("Atoms.zig");
 const Atoms = @import("Atoms.zig").Atoms;
 
 const Actions = @import("actions.zig");
-const Keys = @import("keys.zig");
 
 const Config = @import("config");
 
@@ -20,7 +19,7 @@ const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
 
-// TODO: add the ability for dynamic addition to the workspace list
+// TODO: add master window (large left) cycling
 
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
@@ -162,7 +161,7 @@ pub const Layout = struct {
 
         // Check if the keycode matches the 'open terminal' key and other conditions are met
         if (cycle_keysym == Config.cycle_forward_key and self.workspaces.items[self.current_ws].windows.len >= 1 and (event.state & Config.cycle_forward_super) != 0) {
-            const direction: i2 = if ((event.state & Config.cycle_backward_super_second) != 0) -1 else 1;
+            const direction: i2 = if ((event.state & Config.cycle_backward_super_second) != 0) 1 else -1;
 
             if (direction == 1) {
                 if (self.workspaces.items[self.current_ws].windows.last.?.data.window == self.workspaces.items[self.current_ws].current_focused_window.data.window) {
@@ -386,54 +385,20 @@ pub const Layout = struct {
         _ = event;
     }
 
-    // TODO: Fix the mapping logic, kind of flawed and unmaintainable and gross
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
-        // The background window will be the very first window that is mapped
         _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
-
         _ = c.XSelectInput(@constCast(self.x_display), event.window, c.StructureNotifyMask | c.EnterWindowMask | c.LeaveWindowMask | c.FocusChangeMask);
 
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
-
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
         self.workspaces.items[self.current_ws].windows.prepend(node);
 
-        // TODO: rework the mapping logic
-        // if the window has been modified, in the boolean state, then do not automatically tile when a new window is mapped
-        // fix some small details in the width and height
-        // add mod4 + spacebar to auto till again
-        // Auto tile just makes the currently focused window take up the entire sceren without fullscreenin
+        _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
+        _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, Config.border_width);
+        _ = c.XMapWindow(@constCast(self.x_display), event.window);
 
-        if (self.workspaces.items[self.current_ws].windows.len >= 2) {
-            _ = c.XMapWindow(@constCast(self.x_display), event.window);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, Config.border_width);
-
-            _ = c.XResizeWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, @divFloor(@abs(self.screen_w - 10), 2), @abs(self.screen_h - 10));
-            _ = c.XMoveWindow(@constCast(self.x_display), self.workspaces.items[self.current_ws].windows.first.?.data.window, 0, 0);
-
-            var start: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first.?.next.?;
-
-            var index: u64 = 0;
-            while (start) |win| : (start = win.next) {
-                if (win.data.modified == false) {
-                    _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(@abs(self.screen_w - 10), 2)), @intCast((@divFloor(@abs(self.screen_h - 10), (self.workspaces.items[self.current_ws].windows.len - 1)) - (1 * self.workspaces.items[self.current_ws].windows.len) - 10)));
-
-                    // so much casting :(
-                    const height_of_each_window: c_int = @intCast(@divFloor(self.screen_h, @as(c_int, @intCast((self.workspaces.items[self.current_ws].windows.len - 1)))));
-
-                    // This could be done by updating the `Window` type to store all of its parameters
-                    _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, @intCast(@divFloor(self.screen_w, 2) + 10), @intCast(((height_of_each_window) * @as(c_int, @intCast(index)))));
-                    _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
-                    index += 1;
-                }
-            }
-        } else {
-            _ = c.XResizeWindow(@constCast(self.x_display), event.window, @abs(self.screen_w - 10), @abs(self.screen_h - 10));
-
-            _ = c.XMapWindow(@constCast(self.x_display), event.window);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), event.window, Config.border_width);
-        }
+        try self.workspaces.items[self.current_ws].handleWindowMappingTiling(event.window);
 
         var attributes: c.XWindowAttributes = undefined;
         _ = c.XGetWindowAttributes(@constCast(self.x_display), event.window, &attributes);
@@ -456,8 +421,7 @@ pub const Layout = struct {
             }
         }
 
-        _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
-        _ = c.XRaiseWindow(@constCast(self.x_display), self.statusbar.x_drawable);
+        // _ = c.XRaiseWindow(@constCast(self.x_display), self.statusbar.x_drawable);
         _ = c.XChangeProperty(
             @constCast(self.x_display),
             self.x_rootwindow,
@@ -493,7 +457,15 @@ pub const Layout = struct {
             }
         }
 
+        // This is a specific order
+
         _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_client_list);
+
+        if (self.workspaces.items[self.current_ws].windows.len == 0) return;
+
+        _ = c.XChangeProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, 32, c.PropModeReplace, @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window), 1);
+
+        try self.workspaces.items[self.current_ws].handleWindowDestroyTiling();
 
         var it = self.workspaces.items[self.current_ws].windows.first;
         while (it) |n| : (it = n.next) {
@@ -510,9 +482,6 @@ pub const Layout = struct {
         }
     }
 
-    // There is a bug where right clicking will unset the focus of the window
-    // However pressing Mod4+Clicking into the window seems to slightly fix it
-    // Could be fixed by continuing EWMH & ICCM support
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
         if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
         if (event.subwindow == self.background.background) return;
@@ -528,13 +497,14 @@ pub const Layout = struct {
 
         self.workspaces.items[self.current_ws].mouse = @constCast(event).*;
 
-        _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
+        _ = c.XRaiseWindow(@constCast(self.x_display), event.window);
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, currently_focused);
         _ = c.XSetInputFocus(@constCast(self.x_display), event.subwindow, c.RevertToParent, c.CurrentTime);
 
         const window = self.windowToNode(event.subwindow);
 
         if (window) |w| {
+            w.data.modified = true;
             self.workspaces.items[self.current_ws].windows.remove(w);
             self.workspaces.items[self.current_ws].windows.prepend(w);
 
@@ -565,11 +535,13 @@ pub const Layout = struct {
         const w_x: c_uint = @abs(self.workspaces.items[self.current_ws].win_w + (event.x - self.workspaces.items[self.current_ws].mouse.x));
         const w_y: c_uint = @abs(self.workspaces.items[self.current_ws].win_h + (event.y - self.workspaces.items[self.current_ws].mouse.y));
 
+        // TODO: set minimum window size
+
         _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, currently_focused);
 
         const button: c_uint = self.workspaces.items[self.current_ws].mouse.button;
 
-        const window = self.windowToNode(event.window);
+        const window = self.windowToNode(event.subwindow);
         if (window) |w| {
             w.data.modified = true;
             self.workspaces.items[self.current_ws].windows.remove(w);
@@ -588,24 +560,29 @@ pub const Layout = struct {
             }
         }
 
-        _ = c.XRaiseWindow(@constCast(self.x_display), event.window);
+        if (event.window != self.workspaces.items[self.current_ws].current_focused_window.data.window) {
+            if (button == 1 and self.workspaces.items[self.current_ws].fullscreen == false) {
+                _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, new_x, new_y);
+            }
 
-        if (button == 1 and self.workspaces.items[self.current_ws].fullscreen == false) {
-            _ = c.XMoveWindow(@constCast(self.x_display), event.subwindow, new_x, new_y);
+            if (button == 3 and self.workspaces.items[self.current_ws].fullscreen == false) {
+                self.workspaces.items[self.current_ws].fullscreen = false;
+
+                _ = c.XResizeWindow(@constCast(self.x_display), event.subwindow, w_x, w_y);
+            }
         }
 
-        if (button == 3 and self.workspaces.items[self.current_ws].fullscreen == false) {
-            self.workspaces.items[self.current_ws].fullscreen = false;
-
-            _ = c.XResizeWindow(@constCast(self.x_display), event.subwindow, w_x, w_y);
+        if (self.workspaces.items[self.current_ws].numberOfWindowsModified().number != self.workspaces.items[self.current_ws].windows.len) {
+            self.workspaces.items[self.current_ws].retileAllWindows();
         }
-
         x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.subwindow);
+        _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
     }
 
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         if (event.window == self.statusbar.x_drawable) return;
 
+        // Do NOT make it the focused window
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
 
         const win = self.windowToNode(event.window);

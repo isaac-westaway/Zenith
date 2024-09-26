@@ -56,6 +56,11 @@ pub const inital_number_of_workspaces: comptime_int = 5;
 /// Currently the statusbar is a work in progress, so it is best to keep this as false and only true for development purposes
 pub const enable_statusbar: bool = false;
 
+/// The border gap width to separate all windows, will be ignored on a fullscreen window
+/// It is best to just trial and error what you like, also in future, there will be a way to dynamically change this value, increasing or decreasing
+/// At the most extreme of cases, this integer should be less thaan 500, though you should never really use more than 20 pixels
+pub const window_gap_width: comptime_int = 10;
+
 ///
 /// Keybinds
 ///
