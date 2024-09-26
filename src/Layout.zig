@@ -151,6 +151,7 @@ pub const Layout = struct {
         }
 
         // Handle the fullscreening
+        // TODO: EWMH _NET_WM_FULLSCREEN atom
         // TODO: this needs some small fixes, especially when a user opens another window (ctrl+enter to open a terminal) whilst in the fullscreen state
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.fullscreen_key) {
             try self.workspaces.items[self.current_ws].handleFullscreen();
@@ -465,8 +466,6 @@ pub const Layout = struct {
 
         _ = c.XChangeProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, 32, c.PropModeReplace, @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window), 1);
 
-        try self.workspaces.items[self.current_ws].handleWindowDestroyTiling();
-
         var it = self.workspaces.items[self.current_ws].windows.first;
         while (it) |n| : (it = n.next) {
             _ = c.XChangeProperty(
@@ -480,6 +479,8 @@ pub const Layout = struct {
                 1,
             );
         }
+
+        try self.workspaces.items[self.current_ws].handleWindowDestroyTiling();
     }
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
@@ -572,9 +573,15 @@ pub const Layout = struct {
             }
         }
 
-        if (self.workspaces.items[self.current_ws].numberOfWindowsModified().number != self.workspaces.items[self.current_ws].windows.len) {
+        if (self.workspaces.items[self.current_ws].windows.len - self.workspaces.items[self.current_ws].numberOfWindowsModified().number > 1) {
             self.workspaces.items[self.current_ws].retileAllWindows();
-        }
+        } else if (self.workspaces.items[self.current_ws].windows.len - self.workspaces.items[self.current_ws].numberOfWindowsModified().number == 1) {
+            const unmodified_window = self.workspaces.items[self.current_ws].numberOfWindowsModified().last_unmodified;
+
+            _ = c.XResizeWindow(@constCast(self.x_display), unmodified_window.data.window, @abs(self.screen_w) - (2 * Config.window_gap_width), @abs(self.screen_h) - (2 * Config.window_gap_width));
+
+            _ = c.XMoveWindow(@constCast(self.x_display), unmodified_window.data.window, Config.window_gap_width, Config.window_gap_width);
+        } else {}
         x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.subwindow);
         _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
     }

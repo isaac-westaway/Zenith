@@ -35,6 +35,11 @@ pub const Workspace = struct {
     screen_w: i32,
     screen_h: i32,
 
+    pub fn moveToEnd(self: *Workspace, node: *std.DoublyLinkedList(Window).Node) void {
+        self.windows.remove(node);
+        self.windows.append(node);
+    }
+
     pub fn numberOfWindowsModified(self: *const Workspace) struct { number: u64, last_unmodified: *std.DoublyLinkedList(Window).Node } {
         var start: ?*std.DoublyLinkedList(Window).Node = self.windows.last;
 
@@ -139,11 +144,12 @@ pub const Workspace = struct {
     }
 
     // Do NOT raise any windows here
-    // There is a very slight rounding error when it comes to mapping a lot of windows, in the bottom right corner causing the window to be +-1 pixel out of place
+    // The sizing here is mathematically sound, refer to the screenshot in the images
+    // It could probably benefit from optically centering
     pub fn retileAllWindows(self: *Workspace) void {
         if (self.windows.len == 1) return;
 
-        const left_width: u32 = @abs(@divFloor(self.screen_w - 3 * Config.window_gap_width, 2));
+        const left_width: u32 = @abs(@divFloor(self.screen_w, 2) - (Config.window_gap_width + @divFloor(Config.window_gap_width, 2)));
 
         if (!self.windows.last.?.data.modified) {
             _ = c.XResizeWindow(@constCast(self.x_display), self.windows.last.?.data.window, left_width, @abs(self.screen_h - (2 * Config.window_gap_width)));
@@ -154,13 +160,9 @@ pub const Workspace = struct {
         const total_windows_to_be_modified = self.windows.len - number_of_windows_modified.number;
 
         const right_width = left_width;
-        const remaining_height: u32 = @abs(self.screen_h - (1 * Config.window_gap_width));
+        const remaining_height: u32 = @abs(self.screen_h - (Config.window_gap_width));
 
         var right_window_height: u64 = 0;
-        // Essentially, if there is one window to be modified, then make it take up the entire view port
-
-        // 2 modified
-        // 3 total
 
         if (total_windows_to_be_modified <= 1) {
             right_window_height = @abs(self.screen_h) - (2 * Config.window_gap_width);
@@ -168,10 +170,8 @@ pub const Workspace = struct {
             right_window_height = @divFloor(remaining_height - (total_windows_to_be_modified - 1) * Config.window_gap_width, (total_windows_to_be_modified - 1));
         }
 
-        // The first window mapped that ISNT modified
         const last = self.windows.first;
 
-        // Set this as the master window
         if (last) |win| {
             if (total_windows_to_be_modified == 1) {
                 // cache the window
@@ -203,7 +203,6 @@ pub const Workspace = struct {
             // THE RIGHT SIDE WIDTH DOES NOT LOOK EQUAL BUT MATHEMATICALLY IT IS!!!
             _ = c.XResizeWindow(@constCast(self.x_display), window, @abs(self.screen_w - (2 * Config.window_gap_width)), @abs(self.screen_h - (2 * Config.window_gap_width)));
             _ = c.XMoveWindow(@constCast(self.x_display), window, Config.window_gap_width, Config.window_gap_width);
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), window, Config.border_width);
         }
     }
 
@@ -214,7 +213,7 @@ pub const Workspace = struct {
         if (window) |win| {
             if (self.windows.len == 1 and win.data.modified == false) {
                 _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, Config.window_gap_width, Config.window_gap_width);
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(self.screen_w - (2 * Config.window_gap_width)), @intCast(self.screen_h - (2 * Config.window_gap_width)));
+                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(self.screen_w - (2 * Config.window_gap_width)), @abs(self.screen_h - (2 * Config.window_gap_width)));
             }
         }
 
