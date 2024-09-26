@@ -43,6 +43,9 @@ pub const Input = struct {
         // " ` " aka tilde aka grave aka backtick
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.unfocus_key), Config.unfocus_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.workspace_append_key), Config.worskpace_append_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.workspace_pop_key), Config.workspace_pop_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+
         _ = c.XGrabButton(@constCast(input.x_display), Config.mouse_button_left, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | Config.mouse_motion_left | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
 
         _ = c.XGrabButton(@constCast(input.x_display), Config.mouse_button_right, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | Config.mouse_motion_right | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);

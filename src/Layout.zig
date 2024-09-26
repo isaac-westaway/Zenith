@@ -20,6 +20,8 @@ const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
 
+// TODO: add the ability for dynamic addition to the workspace list
+
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
 // Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height
@@ -197,6 +199,8 @@ pub const Layout = struct {
 
         // Move right a workspace
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.workspace_cycle_forward_key) {
+            if (self.workspaces.items.len == 1) return;
+
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
 
             while (ptr) |node| : (ptr = node.next) {
@@ -229,6 +233,8 @@ pub const Layout = struct {
 
         // Move left a workspace
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.workspace_cycle_backward_key) {
+            if (self.workspaces.items.len == 1) return;
+
             var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
 
             while (ptr) |node| : (ptr = node.next) {
@@ -260,6 +266,7 @@ pub const Layout = struct {
         // Push a window right in a workspace
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.push_forward_key) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
+            if (self.workspaces.items.len == 1) return;
 
             const win = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
 
@@ -292,6 +299,7 @@ pub const Layout = struct {
         // Push a window left in a workspace
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.push_backward_key) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
+            if (self.workspaces.items.len == 1) return;
 
             const win = self.windowToNode(self.workspaces.items[self.current_ws].current_focused_window.data.window);
 
@@ -319,6 +327,57 @@ pub const Layout = struct {
                     }
                 }
             }
+        }
+
+        // Dynamically append another workspace to the list of workspaces
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.workspace_append_key) {
+            const workspace: Workspace = Workspace{ .x_display = self.x_display, .x_rootwindow = self.x_rootwindow, .windows = std.DoublyLinkedList(Window){}, .fullscreen = false, .fs_window = undefined, .current_focused_window = undefined, .mouse = undefined, .win_x = 0, .win_y = 0, .win_w = 0, .win_h = 0, .screen_w = self.screen_w, .screen_h = self.screen_h };
+
+            try self.workspaces.append(workspace);
+
+            _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_number_of_desktops);
+
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_number_of_desktops, c.XA_CARDINAL, self.workspaces.items.len);
+
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
+        }
+
+        // Dynamically pop all workspaces down to 1, if there is only one, do nothing. Why would you want zero workspaces?
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.workspace_pop_key) {
+            // If popping the last workspace, whilst inside the last workspace
+            // Move left a workspace
+            if (self.workspaces.items.len == 1) return;
+
+            if (self.current_ws == self.workspaces.items.len - 1) {
+                var ptr: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
+
+                while (ptr) |node| : (ptr = node.next) {
+                    _ = c.XUnmapWindow(@constCast(self.x_display), node.data.window);
+                }
+
+                if (self.current_ws == 0) {
+                    self.current_ws = @intCast(self.workspaces.items.len - 1);
+                } else {
+                    self.current_ws -= 1;
+                }
+
+                var windows: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.last;
+
+                while (windows) |node| : (windows = node.prev) {
+                    _ = c.XMapWindow(@constCast(self.x_display), node.data.window);
+                }
+
+                try self.workspaces.items[self.current_ws].focusOneUnfocusAll();
+
+                x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
+            }
+            _ = self.workspaces.pop();
+
+            _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_number_of_desktops);
+
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_number_of_desktops, c.XA_CARDINAL, self.workspaces.items.len);
+
+            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
     }
 

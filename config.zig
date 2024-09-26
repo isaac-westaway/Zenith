@@ -19,7 +19,7 @@ pub const picom_command = &[_][]const u8{ "picom", "--config", "/home/isaacwesta
 /// To automatically generate these images, use imagemagick and run `magick`
 /// the images must be in the naming format
 /// This example has the images using the filename out-{n}.bmp
-pub const animated_background: bool = true;
+pub const animated_background: bool = false;
 pub const image_directory: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/orange/";
 pub const image_file_name: []const u8 = "out";
 pub const image_file_extension: []const u8 = "bmp";
@@ -31,14 +31,14 @@ pub const number_of_images: comptime_int = 39;
 pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg";
 
 /// The window that is currently focused
-pub const hard_focused: comptime_int = 0xf44728;
+pub const hard_focused: comptime_int = 0xef9f1c;
 
 /// The window that is being hovered over
 /// Set this to zero, or the unfocused or the hard focused if you do not want three-color behaviour
-pub const soft_focused: comptime_int = 0xeee78d;
+pub const soft_focused: comptime_int = 0xf5c577;
 
 /// The window that is unfocused
-pub const unfocused: comptime_int = 0x5a3e40;
+pub const unfocused: comptime_int = 0x483008;
 
 /// The width of the border
 /// Set this to zero if you do not want a border at all
@@ -112,6 +112,14 @@ pub const workspace_cycle_backward_key: c.Mask = c.XK_a;
 /// Kinda useless, for aesthetic purposes
 pub const unfocus_super: c.Mask = c.Mod4Mask;
 pub const unfocus_key: c.Mask = c.XK_grave;
+
+/// Append a new workspace at the end of the workspace list
+pub const worskpace_append_super: c.Mask = c.Mod4Mask;
+pub const workspace_append_key: c.Mask = c.XK_equal;
+
+/// Pop the last workspace in the list of workspaces, 1,2,3,4,5 -> 1,2,3,4
+pub const workspace_pop_super: c.Mask = c.Mod4Mask;
+pub const workspace_pop_key: c.Mask = c.XK_minus;
 
 /// Move the window by pressing and dragging the left mouse button
 /// The compile time integer must correspond to the integer in mouse_motion_left
