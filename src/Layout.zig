@@ -427,7 +427,16 @@ pub const Layout = struct {
 
         // Swap left right master
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.swap_left_right_mastker_key) {
+            if (self.workspaces.items[self.current_ws].windows.len == 0) return;
             try self.workspaces.items[self.current_ws].swapLeftRightMaster();
+        }
+
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.add_focused_master_key) {
+            try self.workspaces.items[self.current_ws].addWindowAsMaster();
+        }
+
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.add_focused_slave_key) {
+            try self.workspaces.items[self.current_ws].addWindowAsSlave();
         }
     } // resolveKeyInput
 

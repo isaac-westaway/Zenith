@@ -130,6 +130,14 @@ pub const workspace_pop_key: c.Mask = c.XK_minus;
 pub const swap_left_right_master_super: c.Mask = c.Mod4Mask;
 pub const swap_left_right_mastker_key: c.Mask = c.XK_1;
 
+/// Add the currently focused window as the master window in the unmodified layouot
+pub const add_focused_master_super: c.Mask = c.Mod4Mask;
+pub const add_focused_master_key: c.Mask = c.XK_2;
+
+/// Add the currently focused window as a "slave" window in the unmodified layout
+pub const add_focused_slave_super: c.Mask = c.Mod4Mask;
+pub const add_focused_slave_key: c.Mask = c.XK_3;
+
 /// Add the current
 /// Move the window by pressing and dragging the left mouse button
 /// The compile time integer must correspond to the integer in mouse_motion_left

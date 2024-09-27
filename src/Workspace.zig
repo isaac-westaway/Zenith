@@ -46,6 +46,11 @@ pub const Workspace = struct {
     } // moveToEnd
 
     pub fn numberOfWindowsModified(self: *const Workspace) struct { number: u64, last_unmodified: *std.DoublyLinkedList(Window).Node } {
+        if (self.windows.len == 0) return .{
+            .number = 0,
+            .last_unmodified = undefined,
+        };
+
         var start: ?*std.DoublyLinkedList(Window).Node = self.windows.last;
 
         var number_of_windows_modified: usize = 0;
@@ -231,6 +236,7 @@ pub const Workspace = struct {
     pub fn swapLeftRightMaster(self: *Workspace) !void {
         if (self.current_focused_window.data.modified) return;
         if (self.windows.len == 1 or self.windows.len == 0) return;
+
         const total_to_be_modified = self.windows.len - self.numberOfWindowsModified().number;
         if (total_to_be_modified == 1 or total_to_be_modified == 0) return;
 
@@ -268,7 +274,6 @@ pub const Workspace = struct {
 
             self.retileAllWindows();
         } else {
-            // 12 hours of my life :(
             const current_focused_window = self.current_focused_window.data.window;
 
             var previous_window_node: *std.DoublyLinkedList(Window).Node = undefined;
@@ -292,6 +297,45 @@ pub const Workspace = struct {
         return;
     } // swapLeftRightMaster
 
-    fn addWindowAsMaster() !void {} // addWindowAsMaster
-    fn addWindowAsSlave() !void {} // addWindowAsSlave
+    pub fn addWindowAsMaster(self: *Workspace) !void {
+        if (self.windows.len == 0) return;
+
+        if (self.windows.len == 1) {
+            _ = c.XMoveWindow(@constCast(self.x_display), self.current_focused_window.data.window, Config.window_gap_width, Config.window_gap_width);
+            _ = c.XResizeWindow(@constCast(self.x_display), self.current_focused_window.data.window, @abs(self.screen_w) - 2 * Config.window_gap_width, @abs(self.screen_h) - 2 * Config.window_gap_width);
+            return;
+        }
+
+        if (self.current_focused_window.data.modified == false) {
+            if (self.current_focused_window.data.window != self.windows.last.?.data.window) {
+                try self.swapLeftRightMaster();
+            } else return; // if the current focused window already is the unmodified master, do nothing
+        } else {
+            self.moveToEnd(self.current_focused_window);
+            self.current_focused_window.data.modified = false;
+
+            self.retileAllWindows();
+        }
+    } // addWindowAsMaster
+
+    pub fn addWindowAsSlave(self: *Workspace) !void {
+        if (self.windows.len == 0) return;
+
+        if (self.windows.len == 1) {
+            _ = c.XMoveWindow(@constCast(self.x_display), self.current_focused_window.data.window, Config.window_gap_width, Config.window_gap_width);
+            _ = c.XResizeWindow(@constCast(self.x_display), self.current_focused_window.data.window, @abs(self.screen_w) - 2 * Config.window_gap_width, @abs(self.screen_h) - 2 * Config.window_gap_width);
+            return;
+        }
+        if (self.current_focused_window.data.modified == false) {
+            if (self.current_focused_window.data.window == self.windows.last.?.data.window) {
+                try self.swapLeftRightMaster();
+            } else return; // it is already a "slave" window
+        } else {
+            self.moveToEnd(self.current_focused_window);
+            self.moveToEnd(@ptrCast(self.windows.last.?.prev));
+            self.current_focused_window.data.modified = false;
+
+            self.retileAllWindows();
+        }
+    } // addWindowAsSlave
 };
