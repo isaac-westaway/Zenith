@@ -87,7 +87,7 @@ pub const Background = struct {
         background.background = window;
 
         return background;
-    }
+    } // init
 
     pub fn animateWindow(allocator: *std.mem.Allocator, display: *const c.Display, rootwindow: c.Window, screen: *const c.Screen) !Background {
         var background = Background{
@@ -119,7 +119,7 @@ pub const Background = struct {
         background.background = window;
 
         return background;
-    }
+    } // animateWindow
 
     pub fn animateBackground(allocator: *std.mem.Allocator, display: *const c.Display, window: c.Window, rootwindow: c.Window) void {
         _ = rootwindow;
@@ -183,5 +183,5 @@ pub const Background = struct {
                 std.posix.nanosleep(@intCast(timeout.tv_sec), @intCast(timeout.tv_nsec));
             }
         }
-    }
+    } //animateBackground
 };

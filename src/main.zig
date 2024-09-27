@@ -11,4 +11,4 @@ pub fn main() !void {
     defer manager.deinit();
 
     try manager.run();
-}
+} // main

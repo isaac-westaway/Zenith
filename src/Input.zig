@@ -40,6 +40,8 @@ pub const Input = struct {
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.workspace_cycle_forward_key), Config.workspace_cycle_forward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.workspace_cycle_backward_key), Config.workspace_cycle_backward_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
+        _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.swap_left_right_mastker_key), Config.swap_left_right_master_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
+
         // " ` " aka tilde aka grave aka backtick
         _ = c.XGrabKey(@constCast(input.x_display), c.XKeysymToKeycode(@constCast(input.x_display), Config.unfocus_key), Config.unfocus_super, input.x_rootwindow, 0, c.GrabModeAsync, c.GrabModeAsync);
 
@@ -51,5 +53,5 @@ pub const Input = struct {
         _ = c.XGrabButton(@constCast(input.x_display), Config.mouse_button_right, c.Mod4Mask, input.x_rootwindow, 0, c.ButtonPress | Config.mouse_motion_right | @as(c_uint, @intCast(c.PointerMotionMask)), c.GrabModeAsync, c.GrabModeAsync, 0, 0);
 
         return input;
-    }
+    } // init
 };

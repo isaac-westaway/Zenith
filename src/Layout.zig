@@ -56,7 +56,7 @@ pub const Layout = struct {
         }
 
         return null;
-    }
+    } // windowToNode
 
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: c.Window) !Layout {
         var layout: Layout = undefined;
@@ -116,7 +116,7 @@ pub const Layout = struct {
         process.spawn() catch {};
 
         return layout;
-    }
+    } // init
 
     pub fn resolveKeyInput(self: *Layout, event: *c.XKeyPressedEvent) !void {
 
@@ -154,13 +154,14 @@ pub const Layout = struct {
         // TODO: EWMH _NET_WM_FULLSCREEN atom
         // TODO: this needs some small fixes, especially when a user opens another window (ctrl+enter to open a terminal) whilst in the fullscreen state
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.fullscreen_key) {
+            if (self.workspaces.items[self.current_ws].windows.len == 0) return;
             try self.workspaces.items[self.current_ws].handleFullscreen();
         }
 
         // Tab list focusing
         const cycle_keysym = c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0);
 
-        // Check if the keycode matches the 'open terminal' key and other conditions are met
+        // Check if the keycode matches the cycle keysym key and other conditions are met
         if (cycle_keysym == Config.cycle_forward_key and self.workspaces.items[self.current_ws].windows.len >= 1 and (event.state & Config.cycle_forward_super) != 0) {
             const direction: i2 = if ((event.state & Config.cycle_backward_super_second) != 0) 1 else -1;
 
@@ -423,12 +424,17 @@ pub const Layout = struct {
 
             x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_current_desktop, c.XA_CARDINAL, self.current_ws);
         }
-    }
+
+        // Swap left right master
+        if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.swap_left_right_mastker_key) {
+            try self.workspaces.items[self.current_ws].swapLeftRightMaster();
+        }
+    } // resolveKeyInput
 
     pub fn handleCreateNotify(self: *const Layout, event: *const c.XCreateWindowEvent) !void {
         _ = self;
         _ = event;
-    }
+    } // handleCreateNotify
 
     pub fn handleMapRequest(self: *Layout, event: *const c.XMapRequestEvent) !void {
         _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
@@ -478,7 +484,7 @@ pub const Layout = struct {
             1,
         );
         _ = c.XChangeProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, 32, c.PropModeReplace, @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window), 1);
-    }
+    } // handleMapNotify
 
     // TODO: retile unmodified windows here too
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
@@ -525,7 +531,7 @@ pub const Layout = struct {
         }
 
         try self.workspaces.items[self.current_ws].handleWindowDestroyTiling();
-    }
+    } // handleDestroyNotify
 
     pub fn handleButtonPress(self: *Layout, event: *const c.XButtonPressedEvent) !void {
         if (event.window == self.statusbar.x_drawable or event.subwindow == self.statusbar.x_drawable) return;
@@ -565,7 +571,7 @@ pub const Layout = struct {
         }
 
         x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.subwindow);
-    }
+    } // handleButtonPress
 
     pub fn handleMotionNotify(self: *Layout, event: *const c.XMotionEvent) !void {
         if (event.subwindow == self.statusbar.x_drawable) return;
@@ -628,7 +634,7 @@ pub const Layout = struct {
         } else {}
         x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, event.subwindow);
         _ = c.XRaiseWindow(@constCast(self.x_display), event.subwindow);
-    }
+    } // handleMotionNotify
 
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         if (event.window == self.statusbar.x_drawable) return;
@@ -653,7 +659,7 @@ pub const Layout = struct {
                 _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, currently_hovered);
             }
         }
-    }
+    } // handleEnterNotify
 
     pub fn handleLeaveNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         const win = self.windowToNode(event.window);
@@ -666,5 +672,5 @@ pub const Layout = struct {
                 _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, unfocused);
             }
         }
-    }
+    } // handleLeaveNotify
 };

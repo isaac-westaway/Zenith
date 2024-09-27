@@ -53,5 +53,5 @@ pub const Statusbar = struct {
         _ = c.XDrawRectangle(@constCast(statusbar.x_display), statusbar.x_drawable, statusbar.x_gc, 0, 0, x_end, 50);
 
         return statusbar;
-    }
+    } // init
 };

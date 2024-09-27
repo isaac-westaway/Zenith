@@ -126,6 +126,11 @@ pub const workspace_append_key: c.Mask = c.XK_equal;
 pub const workspace_pop_super: c.Mask = c.Mod4Mask;
 pub const workspace_pop_key: c.Mask = c.XK_minus;
 
+/// Swap the left (master) window with the top right
+pub const swap_left_right_master_super: c.Mask = c.Mod4Mask;
+pub const swap_left_right_mastker_key: c.Mask = c.XK_1;
+
+/// Add the current
 /// Move the window by pressing and dragging the left mouse button
 /// The compile time integer must correspond to the integer in mouse_motion_left
 /// Only change this if you know that X11 supports your key, I cannot add support on my own, it is up to Xorg (or wayland once Zenith supports it)

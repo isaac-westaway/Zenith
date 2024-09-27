@@ -35,10 +35,15 @@ pub const Workspace = struct {
     screen_w: i32,
     screen_h: i32,
 
+    pub fn moveToStart(self: *Workspace, node: *std.DoublyLinkedList(Window).Node) void {
+        self.windows.remove(node);
+        self.windows.prepend(node);
+    } // moveToStart
+
     pub fn moveToEnd(self: *Workspace, node: *std.DoublyLinkedList(Window).Node) void {
         self.windows.remove(node);
         self.windows.append(node);
-    }
+    } // moveToEnd
 
     pub fn numberOfWindowsModified(self: *const Workspace) struct { number: u64, last_unmodified: *std.DoublyLinkedList(Window).Node } {
         var start: ?*std.DoublyLinkedList(Window).Node = self.windows.last;
@@ -57,7 +62,7 @@ pub const Workspace = struct {
             .number = number_of_windows_modified,
             .last_unmodified = last_unmodified,
         };
-    }
+    } // numberOfWindowsModified
 
     fn windowToNode(self: *const Workspace, window: c.Window) ?*std.DoublyLinkedList(Window).Node {
         var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
@@ -69,7 +74,7 @@ pub const Workspace = struct {
         }
 
         return null;
-    }
+    } // windowToNode
 
     pub fn handleFullscreen(self: *Workspace) !void {
         if (self.fullscreen == false) {
@@ -116,7 +121,7 @@ pub const Workspace = struct {
 
             return;
         }
-    }
+    } // handleFullscreen
 
     pub fn focusOneUnfocusAll(self: *Workspace) !void {
         if (self.windows.len > 0) {
@@ -132,20 +137,21 @@ pub const Workspace = struct {
             while (ptr) |node| : (ptr = node.next) {
                 if (node.data.window != self.current_focused_window.data.window) {
                     _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, Config.unfocused);
-                }
+                } else continue;
             }
         } else return;
-    }
+    } // focuseOneUnfocusAll
 
     pub fn closeFocusedWindow(self: *Workspace) !void {
         if (self.windows.len == 0) return;
 
         _ = c.XDestroyWindow(@constCast(self.x_display), self.current_focused_window.data.window);
-    }
+    } // closeFocusedWindow
 
     // Do NOT raise any windows here
     // The sizing here is mathematically sound, refer to the screenshot in the images
     // It could probably benefit from optically centering
+    // If you would like to contribute, the general details is the master left window is the last node in the linked list, and the bottom right is the first
     pub fn retileAllWindows(self: *Workspace) void {
         if (self.windows.len == 1) return;
 
@@ -192,7 +198,7 @@ pub const Workspace = struct {
                 index += 1;
             }
         }
-    }
+    } // retileAllWindows
 
     pub fn handleWindowMappingTiling(self: *Workspace, window: c.Window) !void {
         const number_of_windows_modified = self.numberOfWindowsModified();
@@ -204,7 +210,7 @@ pub const Workspace = struct {
             _ = c.XResizeWindow(@constCast(self.x_display), window, @abs(self.screen_w - (2 * Config.window_gap_width)), @abs(self.screen_h - (2 * Config.window_gap_width)));
             _ = c.XMoveWindow(@constCast(self.x_display), window, Config.window_gap_width, Config.window_gap_width);
         }
-    }
+    } // handleWindowMapTiling
 
     pub fn handleWindowDestroyTiling(self: *Workspace) !void {
         if (self.windows.len == 0) return;
@@ -220,11 +226,72 @@ pub const Workspace = struct {
         if (self.windows.len >= 2) {
             self.retileAllWindows();
         }
-    }
+    } // handleWindowDestroyTiling
 
-    pub fn swapLeftRightMaster() !void {}
-    pub fn addWindowAsMaster() !void {}
-    pub fn addWindowAsSlave() !void {}
-    pub fn swapVerticalHorizontalTiling() !void {}
-    pub fn swapAboveBelowTiling() !void {}
+    pub fn swapLeftRightMaster(self: *Workspace) !void {
+        if (self.current_focused_window.data.modified) return;
+        if (self.windows.len == 1 or self.windows.len == 0) return;
+        const total_to_be_modified = self.windows.len - self.numberOfWindowsModified().number;
+        if (total_to_be_modified == 1 or total_to_be_modified == 0) return;
+
+        // TODO: update this so it is no longer the length, but the number of modifiable windows
+        if (self.windows.len == 2) {
+            if (self.current_focused_window.data.window == self.windows.first.?.data.window) {
+                self.moveToEnd(@ptrCast(self.windows.first));
+
+                self.retileAllWindows();
+
+                return;
+            } else if (self.current_focused_window.data.window == self.windows.last.?.data.window) {
+                self.moveToStart(@ptrCast(self.windows.last));
+
+                self.retileAllWindows();
+
+                return;
+            }
+        }
+
+        // If the master window, then swap the master with the topright
+        // TODO: to update to the first window that is NOT modifiable
+        // do it in a function of find first unmodified
+        if (self.current_focused_window.data.window == self.windows.last.?.data.window) {
+            const top_right_window = self.windows.last.?.prev;
+
+            self.moveToEnd(@ptrCast(top_right_window));
+
+            self.windows.remove(self.current_focused_window);
+            self.windows.insertBefore(@ptrCast(self.windows.last), self.current_focused_window);
+
+            self.retileAllWindows();
+        } else if (self.current_focused_window.data.window == self.windows.last.?.prev.?.data.window) {
+            self.moveToEnd(self.current_focused_window);
+
+            self.retileAllWindows();
+        } else {
+            // 12 hours of my life :(
+            const current_focused_window = self.current_focused_window.data.window;
+
+            var previous_window_node: *std.DoublyLinkedList(Window).Node = undefined;
+            var start = self.windows.last;
+            while (start) |win| : (start = win.prev) {
+                if (win.data.window == current_focused_window) break else {
+                    previous_window_node = win;
+                }
+            }
+
+            self.moveToEnd(self.current_focused_window);
+
+            const now_second_last = self.windows.last.?.prev;
+
+            self.windows.remove(@ptrCast(now_second_last));
+            self.windows.insertBefore(@constCast(previous_window_node), @ptrCast(now_second_last));
+
+            self.retileAllWindows();
+        }
+
+        return;
+    } // swapLeftRightMaster
+
+    fn addWindowAsMaster() !void {} // addWindowAsMaster
+    fn addWindowAsSlave() !void {} // addWindowAsSlave
 };

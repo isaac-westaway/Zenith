@@ -85,7 +85,7 @@ pub const Atoms = struct {
         );
 
         return atoms;
-    }
+    } // init
 
     pub fn updateNormalHints(self: *Atoms) void {
         var hints: c.XSizeHints = undefined;
@@ -105,5 +105,5 @@ pub const Atoms = struct {
                 self.max_size = self.min_size;
             }
         }
-    }
+    } // updateNormalHints
 };

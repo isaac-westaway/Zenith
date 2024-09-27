@@ -39,7 +39,7 @@ pub const Manager = struct {
         _ = c.XSync(@constCast(manager.x_display), 0);
 
         return manager;
-    }
+    } // init
 
     pub fn run(self: *Manager) !void {
         // try Logger.Log.info("ZWM_RUN", "Running the window manager", .{});
@@ -91,7 +91,7 @@ pub const Manager = struct {
                 else => {},
             }
         }
-    }
+    } // run
 
     fn handleError(_: ?*c.Display, event: [*c]c.XErrorEvent) callconv(.C) c_int {
         const evt: *c.XErrorEvent = @ptrCast(event);
@@ -122,7 +122,7 @@ pub const Manager = struct {
         }
 
         return 0;
-    }
+    } // handleError
 
     /// Invalidates the contents of the display
     pub fn deinit(self: *const Manager) void {
