@@ -19,7 +19,7 @@ const currently_focused = Config.hard_focused;
 const currently_hovered = Config.soft_focused;
 const unfocused = Config.unfocused;
 
-// TODO: add master window (large left) cycling
+// TODO: fix when pushing window left and right can tiling can lead to bad window error occasionally
 
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
