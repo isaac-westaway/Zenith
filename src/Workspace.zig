@@ -338,4 +338,8 @@ pub const Workspace = struct {
             self.retileAllWindows();
         }
     } // addWindowAsSlave
+
+    pub fn swapLeftRightRightLeft(self: *Workspace) !void {
+        _ = self;
+    }
 };

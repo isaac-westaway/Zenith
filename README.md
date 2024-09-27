@@ -92,6 +92,9 @@ Every key alphabetic key you see is in lowercase
 | Resize Window | Mod4 + Click and drag right mouse button |
 | Add a workspace (dynamically) to the end | Mod4 + equals |
 | Remove a workspace (dynamically) at the end | Mod4 + minus |
+| Swap the Left and Right focused (Master, Slave) Windows | Mod4 + 1 |
+| Add the current focused window as a Master to the layout | Mod4 + 2 |
+| Add the current focused window as a Slave to the layout | Mod4 + 3 |
 
 
 Todo
@@ -99,7 +102,6 @@ Todo
 
 Bug fixes & Updates
 -------------------
-- More todos specified in `Layout.zig` and `config.zig`
 - Installation Script
 - XSession config file
 - Multiple monitor support -> this is planned, I just don't have another screen to work with
