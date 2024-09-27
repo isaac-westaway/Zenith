@@ -20,15 +20,20 @@ pub const picom_command = &[_][]const u8{ "picom", "--config", "/home/isaacwesta
 /// the images must be in the naming format
 /// This example has the images using the filename out-{n}.bmp
 pub const animated_background: bool = true;
-pub const image_directory: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/orange/";
-pub const image_file_name: []const u8 = "out";
-pub const image_file_extension: []const u8 = "bmp";
+/// Example: /home/isaacwestaway/Documents/zig/zwm/image/orange/
+pub const image_directory: []const u8 = "";
+/// Example: out
+pub const image_file_name: []const u8 = "";
+/// Example: bmp
+pub const image_file_extension: []const u8 = "";
 /// Excluding zero, so for 0-22 images would be 22
-pub const number_of_images: comptime_int = 249;
+/// Example: 249
+pub const number_of_images: comptime_int = 0;
 
 /// The absolute path to the background, leave blank if you do NOT want a background
 /// Begins at "/"
-pub const background_path: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg";
+/// Example: /home/isaacwestaway/Documents/zig/zwm/image/spacex1.jpg
+pub const background_path: []const u8 = "";
 
 /// The window that is currently focused
 pub const hard_focused: comptime_int = 0xef9f1c;

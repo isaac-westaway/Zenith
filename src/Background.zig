@@ -35,17 +35,14 @@ pub const Background = struct {
 
         const scr = c.DefaultScreen(@constCast(background.x_display));
 
-        const dpy: *const c.Display = background.x_display;
-
-        const blackpixel = c.XBlackPixel(@constCast(dpy), scr);
-        const whitepixel = c.XWhitePixel(@constCast(dpy), scr);
+        const blackpixel = c.XBlackPixel(@constCast(display), scr);
 
         const screen_width: c_uint = @intCast(c.XDisplayWidth(@constCast(display), scr));
         const screen_height: c_uint = @intCast(c.XDisplayHeight(@constCast(display), scr));
 
         const window_attributes = c.XSetWindowAttributes{ .override_redirect = 1, .background_pixel = 0xFFFFFFFF };
 
-        const window = c.XCreateSimpleWindow(@constCast(background.x_display), background.x_rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, whitepixel);
+        const window = c.XCreateSimpleWindow(@constCast(background.x_display), background.x_rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, blackpixel);
         _ = c.XMapWindow(@constCast(background.x_display), window);
 
         _ = c.XConfigureWindow(@constCast(background.x_display), window, c.CWOverrideRedirect, @ptrCast(@constCast(&window_attributes)));
@@ -100,15 +97,12 @@ pub const Background = struct {
 
         const scr = c.DefaultScreen(@constCast(display));
 
-        const dpy: *const c.Display = display;
-
-        const blackpixel = c.XBlackPixel(@constCast(dpy), scr);
-        const whitepixel = c.XWhitePixel(@constCast(dpy), scr);
+        const blackpixel = c.XBlackPixel(@constCast(display), scr);
 
         const screen_width: c_uint = @intCast(c.XDisplayWidth(@constCast(display), scr));
         const screen_height: c_uint = @intCast(c.XDisplayHeight(@constCast(display), scr));
 
-        const window = c.XCreateSimpleWindow(@constCast(display), rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, whitepixel);
+        const window = c.XCreateSimpleWindow(@constCast(display), rootwindow, 0, 0, screen_width, screen_height, 0, blackpixel, blackpixel);
 
         const opacity_atom: c.Atom = c.XInternAtom(@constCast(background.x_display), "_NET_WM_WINDOW_OPACITY", c.False);
 
@@ -125,11 +119,9 @@ pub const Background = struct {
         _ = rootwindow;
         const scr = c.DefaultScreen(@constCast(display));
 
-        const dp: ?*c.Display = @constCast(display);
-
-        Imlib.imlib_context_set_display(@ptrCast(dp));
-        Imlib.imlib_context_set_visual(@ptrCast(c.DefaultVisual(dp, scr)));
-        Imlib.imlib_context_set_colormap(c.DefaultColormap(dp, scr));
+        Imlib.imlib_context_set_display(@ptrCast(@constCast(display)));
+        Imlib.imlib_context_set_visual(@ptrCast(c.DefaultVisual(display, scr)));
+        Imlib.imlib_context_set_colormap(c.DefaultColormap(display, scr));
 
         const screen = c.DefaultScreen(@constCast(display));
 

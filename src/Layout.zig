@@ -28,6 +28,7 @@ const unfocused = Config.unfocused;
 // -- then you could press mod4+Spsace to tile the workspace
 // Also add the ability to hide the cursor
 // Iideas: command to hide the border
+// Ideas: add the ability to grow and change the border using the mouse button 2, the scroll wheel
 
 pub const Layout = struct {
     allocator: *std.mem.Allocator,

@@ -12,7 +12,6 @@ Hopefully this window manager is different.
 
 A lot of inspiration for this window manager came from DWM and Ragnar so check it out!
 
-
 Features
 ========
 
