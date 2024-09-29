@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Logger = @import("zlog");
-
 const Config = @import("config");
 
 pub fn openTerminal(allocator: *std.mem.Allocator) void {

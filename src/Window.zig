@@ -5,7 +5,6 @@ pub const Window = struct {
     fullscreen: bool,
     modified: bool,
 
-    // We need fullscreen window data because what if the user chooses to move around the fullscreen window
     f_x: i32,
     f_y: i32,
 

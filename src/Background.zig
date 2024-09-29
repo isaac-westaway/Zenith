@@ -6,14 +6,11 @@ const c = @import("x11.zig").c;
 const A = @import("Atoms.zig");
 const Atoms = @import("Atoms.zig").Atoms;
 
-const Imlib2 = @cImport({
+const Imlib = @cImport({
     @cInclude("Imlib2.h");
 });
-const Imlib = Imlib2;
 
 const Config = @import("config");
-
-// Yes i acknowledge the code here is pretty bad, dpy, display, 10^3 variables with the same use
 
 pub const Background = struct {
     allocator: *std.mem.Allocator,
@@ -23,6 +20,7 @@ pub const Background = struct {
     x_screen: *const c.Screen,
 
     background: c.Window,
+    background_image_index: u64,
 
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, rootwindow: c.Window, screen: *const c.Screen) !Background {
         var background: Background = Background{
@@ -63,7 +61,6 @@ pub const Background = struct {
         const image: Imlib.Imlib_Image = Imlib.imlib_load_image(@ptrCast(Config.background_path));
         Imlib.imlib_context_set_image(image);
 
-        // TODO: make the background setting dynamically sized to the monitor
         const src_width: c_int = Imlib.imlib_image_get_width();
         const src_height: c_int = Imlib.imlib_image_get_height();
         const dst_width: c_int = @intCast(screen_width);
@@ -93,6 +90,7 @@ pub const Background = struct {
             .x_rootwindow = rootwindow,
             .x_screen = screen,
             .background = undefined,
+            .background_image_index = 0,
         };
 
         const scr = c.DefaultScreen(@constCast(display));

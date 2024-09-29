@@ -73,7 +73,7 @@ Taking a screenshot requires the `scrot` package to be installed
 
 Every key alphabetic key you see is in lowercase
 
-| To be Documented | Keybind |
+| Function | Keybind |
 | ---------------- | ------- |
 | Open Terminal    | Mod4 + Return (Enter) |
 | Close Window Manager | Mod4 + Escape |
@@ -99,14 +99,14 @@ Every key alphabetic key you see is in lowercase
 Todo
 ====
 
-Bug fixes & Updates
--------------------
-- Installation Script
-- XSession config file
-- Multiple monitor support -> this is planned, I just don't have another screen to work with
-- Wayland Support
+Bug fixes
+---------
+- Minor logic errors and Atom support specified in `layout.zig` and `workspace.zig`
+
+Planned Updates
+---------------
+- Multiple monitor support -> I just don't have another screen to work with
 - Write a tutorial in the project Wiki on how to set an animated background
-- Could probably modify the Animated Background to remove the need for imagemagick and automatically convert a gif to a series of images
 
 Currently supported atoms
 -------------------------

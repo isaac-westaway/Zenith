@@ -2,6 +2,7 @@ const std = @import("std");
 
 const c = @import("x11.zig").c;
 
+/// This status bar is still in development, currently is just aa boilerplate window to write to
 pub const Statusbar = struct {
     allocator: *std.mem.Allocator,
 

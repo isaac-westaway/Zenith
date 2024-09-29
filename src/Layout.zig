@@ -15,21 +15,6 @@ const Actions = @import("actions.zig");
 
 const Config = @import("config");
 
-const currently_focused = Config.hard_focused;
-const currently_hovered = Config.soft_focused;
-const unfocused = Config.unfocused;
-
-// TODO: fix when pushing window left and right can tiling can lead to bad window error occasionally
-
-// Ideas: add the ability to control window x and y position using mod4+Arrow Keys
-// Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
-// Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height
-// Ideas: add the ability to create a terminal pad without any particular resizing or modification, just a small scratchpad near the cursor
-// -- then you could press mod4+Spsace to tile the workspace
-// Also add the ability to hide the cursor
-// Iideas: command to hide the border
-// Ideas: add the ability to grow and change the border using the mouse button 2, the scroll wheel
-
 pub const Layout = struct {
     allocator: *std.mem.Allocator,
 
@@ -44,6 +29,8 @@ pub const Layout = struct {
     background: Background,
     workspaces: std.ArrayList(Workspace),
     current_ws: u32,
+
+    bg_thread: std.Thread,
 
     atoms: Atoms,
 
@@ -84,7 +71,6 @@ pub const Layout = struct {
 
         layout.current_ws = 0;
         for (layout.workspaces.items) |*workspace| {
-            // Why is the auto formatter like this :(
             workspace.* = Workspace{ .x_display = layout.x_display, .x_rootwindow = layout.x_rootwindow, .windows = std.DoublyLinkedList(Window){}, .fullscreen = false, .fs_window = undefined, .current_focused_window = undefined, .mouse = undefined, .win_x = 0, .win_y = 0, .win_w = 0, .win_h = 0, .screen_w = layout.screen_w, .screen_h = layout.screen_h };
         }
 
@@ -93,7 +79,6 @@ pub const Layout = struct {
         }
 
         layout.atoms = try Atoms.init(layout.allocator, layout.x_display, &layout.x_rootwindow);
-        layout.atoms.updateNormalHints();
 
         _ = c.XDeleteProperty(@constCast(layout.x_display), layout.x_rootwindow, A.net_client_list);
 
@@ -106,9 +91,15 @@ pub const Layout = struct {
         } else {
             layout.background = try Background.animateWindow(allocator, layout.x_display, layout.x_rootwindow, layout.x_screen);
 
-            const thread = try std.Thread.spawn(.{ .allocator = allocator.* }, Background.animateBackground, .{ allocator, layout.x_display, layout.background.background, layout.x_rootwindow });
+            layout.bg_thread = try std.Thread.spawn(.{ .allocator = allocator.* }, Background.animateBackground, .{
+                allocator,
+                layout.x_display,
+                layout.background.background,
+                layout.x_rootwindow,
+                // layout.background.background_image_index,
+            });
 
-            thread.detach();
+            layout.bg_thread.detach();
         }
 
         // Begin picom process, if applicable
@@ -152,8 +143,6 @@ pub const Layout = struct {
         }
 
         // Handle the fullscreening
-        // TODO: EWMH _NET_WM_FULLSCREEN atom
-        // TODO: this needs some small fixes, especially when a user opens another window (ctrl+enter to open a terminal) whilst in the fullscreen state
         if (c.XkbKeycodeToKeysym(@constCast(self.x_display), @intCast(event.keycode), 0, 0) == Config.fullscreen_key) {
             if (self.workspaces.items[self.current_ws].windows.len == 0) return;
             try self.workspaces.items[self.current_ws].handleFullscreen();
@@ -292,7 +281,7 @@ pub const Layout = struct {
                 // Should come up with a better name
                 while (window) |_window| : (window = _window.next) {
                     if (_window.data.window != self.workspaces.items[ws].current_focused_window.data.window) {
-                        _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, unfocused);
+                        _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, Config.unfocused);
                     }
                 }
 
@@ -347,7 +336,7 @@ pub const Layout = struct {
 
                 while (window) |_window| : (window = _window.next) {
                     if (_window.data.window != self.workspaces.items[ws].current_focused_window.data.window) {
-                        _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, unfocused);
+                        _ = c.XSetWindowBorder(@constCast(self.x_display), _window.data.window, Config.unfocused);
                     }
                 }
 
@@ -476,13 +465,12 @@ pub const Layout = struct {
         var s: ?*std.DoublyLinkedList(Window).Node = self.workspaces.items[self.current_ws].windows.first;
         while (s) |win| : (s = win.next) {
             if (win.data.window == self.workspaces.items[self.current_ws].current_focused_window.data.window) {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, currently_focused);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, Config.hard_focused);
             } else {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, unfocused);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, Config.unfocused);
             }
         }
 
-        // _ = c.XRaiseWindow(@constCast(self.x_display), self.statusbar.x_drawable);
         _ = c.XChangeProperty(
             @constCast(self.x_display),
             self.x_rootwindow,
@@ -496,7 +484,6 @@ pub const Layout = struct {
         _ = c.XChangeProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window, c.XA_WINDOW, 32, c.PropModeReplace, @ptrCast(&self.workspaces.items[self.current_ws].current_focused_window.data.window), 1);
     } // handleMapNotify
 
-    // TODO: retile unmodified windows here too
     pub fn handleDestroyNotify(self: *Layout, event: *const c.XDestroyWindowEvent) !void {
         _ = c.XDeleteProperty(@constCast(self.x_display), self.x_rootwindow, A.net_active_window);
 
@@ -511,7 +498,7 @@ pub const Layout = struct {
 
             if (self.workspaces.items[self.current_ws].windows.len >= 1) {
                 self.workspaces.items[self.current_ws].current_focused_window = @ptrCast(self.workspaces.items[self.current_ws].windows.last);
-                _ = c.XSetWindowBorder(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, currently_focused);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, Config.hard_focused);
                 _ = c.XSetInputFocus(@constCast(self.x_display), self.workspaces.items[self.current_ws].current_focused_window.data.window, c.RevertToParent, c.CurrentTime);
             } else {
                 _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
@@ -559,7 +546,7 @@ pub const Layout = struct {
         self.workspaces.items[self.current_ws].mouse = @constCast(event).*;
 
         _ = c.XRaiseWindow(@constCast(self.x_display), event.window);
-        _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, currently_focused);
+        _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, Config.hard_focused);
         _ = c.XSetInputFocus(@constCast(self.x_display), event.subwindow, c.RevertToParent, c.CurrentTime);
 
         const window = self.windowToNode(event.subwindow);
@@ -576,7 +563,7 @@ pub const Layout = struct {
 
         while (start) |win| : (start = win.next) {
             if (win.data.window != self.workspaces.items[self.current_ws].current_focused_window.data.window) {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, unfocused);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, Config.unfocused);
             }
         }
 
@@ -596,9 +583,7 @@ pub const Layout = struct {
         const w_x: c_uint = @abs(self.workspaces.items[self.current_ws].win_w + (event.x - self.workspaces.items[self.current_ws].mouse.x));
         const w_y: c_uint = @abs(self.workspaces.items[self.current_ws].win_h + (event.y - self.workspaces.items[self.current_ws].mouse.y));
 
-        // TODO: set minimum window size
-
-        _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, currently_focused);
+        _ = c.XSetWindowBorder(@constCast(self.x_display), event.subwindow, Config.hard_focused);
 
         const button: c_uint = self.workspaces.items[self.current_ws].mouse.button;
 
@@ -617,7 +602,7 @@ pub const Layout = struct {
             if (win.data.window == self.workspaces.items[self.current_ws].current_focused_window.data.window) {
                 continue;
             } else if (win.data.window != event.window) {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, unfocused);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), win.data.window, Config.unfocused);
             }
         }
 
@@ -666,7 +651,7 @@ pub const Layout = struct {
 
         if (win) |w| {
             if (w.data.window != self.workspaces.items[self.current_ws].current_focused_window.data.window) {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, currently_hovered);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, Config.soft_focused);
             }
         }
     } // handleEnterNotify
@@ -679,8 +664,22 @@ pub const Layout = struct {
         if (win) |w| {
             _ = c.XSetInputFocus(@constCast(self.x_display), c.DefaultRootWindow(@constCast(self.x_display)), c.RevertToParent, c.CurrentTime);
             if (w.data.window != self.workspaces.items[self.current_ws].current_focused_window.data.window) {
-                _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, unfocused);
+                _ = c.XSetWindowBorder(@constCast(self.x_display), event.window, Config.unfocused);
             }
         }
     } // handleLeaveNotify
 };
+
+// TODO: when popping a window from a workspace, destroy ALL the windows in that workspace, this is the reason for bad window error below
+// TODO: fix when pushing window left and right can tiling can lead to bad window error occasionally
+// TODO: add the ability to create a initially modified floating window
+// TODO: EWMH _NET_WM_FULLSCREEN atom
+// TODO: when resizing, set minimum window size
+// Ideas: add the ability to control window x and y position using mod4+Arrow Keys
+// Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
+// Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height
+// Ideas: add the ability to create a terminal pad without any particular resizing or modification, just a small scratchpad near the cursor
+// -- then you could press mod4+Spsace to tile the workspace
+// Also add the ability to hide the cursor
+// Iideas: command to hide the border
+// Ideas: add the ability to grow and change the border using the mouse button 2, the scroll wheel

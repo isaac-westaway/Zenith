@@ -2,8 +2,6 @@ const std = @import("std");
 
 const c = @import("x11.zig").c;
 
-const Utils = @import("utils.zig");
-
 pub var zenith_main_factor: c.Atom = undefined;
 pub var utf8_string: c.Atom = undefined;
 pub var wm_protocols: c.Atom = undefined;
@@ -33,20 +31,12 @@ pub const Atoms = struct {
     x_display: *const c.Display,
     x_rootwindow: *const c.Window,
 
-    base_size: Utils.IntVec2,
-    min_size: Utils.IntVec2,
-    max_size: Utils.IntVec2,
-
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: *const c.Window) !Atoms {
         const atoms: Atoms = Atoms{
             .allocator = allocator,
 
             .x_display = display,
             .x_rootwindow = window,
-
-            .base_size = Utils.IntVec2.init(0, 0),
-            .min_size = Utils.IntVec2.init(1, 1),
-            .max_size = Utils.IntVec2.init(std.math.maxInt(i32), std.math.maxInt(i32)),
         };
 
         zenith_main_factor = c.XInternAtom(@constCast(display), "ZWM_MAIN_FACTOR", 0);
@@ -86,24 +76,4 @@ pub const Atoms = struct {
 
         return atoms;
     } // init
-
-    pub fn updateNormalHints(self: *Atoms) void {
-        var hints: c.XSizeHints = undefined;
-        var unused: c_long = undefined;
-
-        if (c.XGetWMNormalHints(@constCast(self.x_display), @constCast(self.x_rootwindow).*, &hints, &unused) != 0) {
-            if (hints.flags & c.PMinSize != 0) self.min_size = Utils.IntVec2.init(hints.min_width, hints.min_height);
-            if (hints.flags & c.PMaxSize != 0) self.max_size = Utils.IntVec2.init(hints.max_width, hints.max_height);
-
-            if (hints.flags & c.PBaseSize != 0) {
-                self.base_size = Utils.IntVec2.init(hints.base_width, hints.base_height);
-            } else {
-                self.base_size = self.min_size;
-            }
-
-            if (self.max_size.lessThan(self.min_size)) {
-                self.max_size = self.min_size;
-            }
-        }
-    } // updateNormalHints
 };

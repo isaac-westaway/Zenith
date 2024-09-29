@@ -4,15 +4,12 @@ const c = @import("x11.zig").c;
 
 const Config = @import("config");
 
-/// Is this struct even necessary?
 pub const Input = struct {
     allocator: *std.mem.Allocator,
 
-    // Do I really need all this?
     x_display: *const c.Display,
     x_rootwindow: c.Window,
 
-    /// Grabs input
     pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, rootwindow: c.Window) !Input {
         var input: Input = undefined;
 
@@ -20,6 +17,8 @@ pub const Input = struct {
 
         input.x_display = display;
         input.x_rootwindow = rootwindow;
+
+        // Could potentially turn this into a for loop, though config isn't any form of a list
 
         _ = c.XUngrabKey(@constCast(input.x_display), c.AnyKey, c.AnyModifier, input.x_rootwindow);
 

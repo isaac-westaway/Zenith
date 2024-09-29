@@ -11,8 +11,6 @@ const Actions = @import("actions.zig");
 
 const Config = @import("config");
 
-// Could probably simplify this file by having two doubly linked lists: one modified and one unmodified
-
 pub const Workspace = struct {
     x_display: *const c.Display,
     x_rootwindow: c.Window,
@@ -23,10 +21,8 @@ pub const Workspace = struct {
     fullscreen: bool,
     fs_window: *std.DoublyLinkedList(Window).Node,
 
-    // Could be moved into `Layout` scope
     mouse: c.XButtonEvent,
 
-    // Temp variables when a window is clicked to handle the point between clicking and clicking and dragging
     win_x: i32,
     win_y: i32,
     win_w: i32,
@@ -153,10 +149,6 @@ pub const Workspace = struct {
         _ = c.XDestroyWindow(@constCast(self.x_display), self.current_focused_window.data.window);
     } // closeFocusedWindow
 
-    // Do NOT raise any windows here
-    // The sizing here is mathematically sound, refer to the screenshot in the images
-    // It could probably benefit from optically centering
-    // If you would like to contribute, the general details is the master left window is the last node in the linked list, and the bottom right is the first
     pub fn retileAllWindows(self: *Workspace) void {
         if (self.windows.len == 1) return;
 
@@ -233,6 +225,8 @@ pub const Workspace = struct {
         }
     } // handleWindowDestroyTiling
 
+    // TODO: minor update, swapping left right master, when more than two initially modified windows, creating 2 unmodified windows and swapping leads
+    // To odd behavious, where the window goes off screen
     pub fn swapLeftRightMaster(self: *Workspace) !void {
         if (self.current_focused_window.data.modified) return;
         if (self.windows.len == 1 or self.windows.len == 0) return;
@@ -240,7 +234,6 @@ pub const Workspace = struct {
         const total_to_be_modified = self.windows.len - self.numberOfWindowsModified().number;
         if (total_to_be_modified == 1 or total_to_be_modified == 0) return;
 
-        // TODO: update this so it is no longer the length, but the number of modifiable windows
         if (self.windows.len == 2) {
             if (self.current_focused_window.data.window == self.windows.first.?.data.window) {
                 self.moveToEnd(@ptrCast(self.windows.first));
