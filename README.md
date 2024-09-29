@@ -105,6 +105,7 @@ Bug fixes
 
 Planned Updates
 ---------------
+- Statusbar
 - Multiple monitor support -> I just don't have another screen to work with
 - Write a tutorial in the project Wiki on how to set an animated background
 
