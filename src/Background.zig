@@ -139,7 +139,7 @@ pub const Background = struct {
             const file_path = std.fmt.allocPrint(allocator.*, "{s}{s}-{d}.{s}", .{ Config.image_directory, Config.image_file_name, index, Config.image_file_extension }) catch unreachable;
 
             const null_term_slice = allocator.dupeZ(u8, file_path[0..file_path.len]) catch unreachable;
-
+            // TODO: load in parallel
             images[index] = Imlib.imlib_load_image(null_term_slice);
         }
 

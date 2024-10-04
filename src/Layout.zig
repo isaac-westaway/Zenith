@@ -442,6 +442,14 @@ pub const Layout = struct {
         const window: Window = Window{ .window = event.window, .modified = false, .fullscreen = false, .w_x = 0, .w_y = 0, .w_w = 0, .w_h = 0, .f_x = 0, .f_y = 0, .f_w = 0, .f_h = 0 };
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
+
+        var transient_window: c.Window = undefined;
+        _ = c.XGetTransientForHint(@constCast(self.x_display), event.window, &transient_window);
+
+        if (transient_window == node.data.window) {
+            node.data.modified = true;
+        }
+
         self.workspaces.items[self.current_ws].windows.prepend(node);
 
         _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
