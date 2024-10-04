@@ -5,6 +5,8 @@
 Overview
 =======
 
+**This window manager IS still being worked on, (hence the todo) I just do not have much time right now because im in my final year of schooling**
+
 Zenith is a tiling window manager written in zig for extensibility and modification, in case you would like to write your own window manager with some niche features.
 
 The reason the project is laid out as it is, is because most window managers I have came across serve their window manager in some 5 thousand line source file, which there is nothing wrong with, just making a small modification is quite difficult. Especially if it is a really minor change like being able to move around windows in firefox.
