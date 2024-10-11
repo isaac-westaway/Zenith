@@ -21,14 +21,14 @@ pub const picom_command = &[_][]const u8{ "picom", "--config", "/home/isaacwesta
 /// This example has the images using the filename out-{n}.bmp
 pub const animated_background: bool = true;
 /// Example: /home/isaacwestaway/Documents/zig/zwm/image/orange/
-pub const image_directory: []const u8 = "";
+pub const image_directory: []const u8 = "/home/isaacwestaway/Documents/zig/zwm/image/orange/";
 /// Example: out
-pub const image_file_name: []const u8 = "";
+pub const image_file_name: []const u8 = "out";
 /// Example: bmp
-pub const image_file_extension: []const u8 = "";
+pub const image_file_extension: []const u8 = "bmp";
 /// Excluding zero, so for 0-22 images would be 22
 /// Example: 249
-pub const number_of_images: comptime_int = 0;
+pub const number_of_images: comptime_int = 249;
 
 /// The absolute path to the background, leave blank if you do NOT want a background
 /// Begins at "/"

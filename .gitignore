@@ -3,5 +3,6 @@ zig-out
 
 *.log
 .vscode
+Session.vim
 
 image

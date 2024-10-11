@@ -103,9 +103,11 @@ pub const Layout = struct {
         }
 
         // Begin picom process, if applicable
-        var process = std.process.Child.init(Config.picom_command, allocator.*);
 
-        process.spawn() catch {};
+        if (Config.picom_command.len > 1) {
+            var process = std.process.Child.init(Config.picom_command, allocator.*);
+            process.spawn() catch {};
+        }
 
         return layout;
     } // init
@@ -443,10 +445,10 @@ pub const Layout = struct {
         var node: *std.DoublyLinkedList(Window).Node = try self.allocator.*.create(std.DoublyLinkedList(Window).Node);
         node.data = window;
 
-        var transient_window: c.Window = undefined;
-        _ = c.XGetTransientForHint(@constCast(self.x_display), event.window, &transient_window);
+        var transient_for: c.Window = undefined;
+        const result = c.XGetTransientForHint(@constCast(self.x_display), event.window, &transient_for);
 
-        if (transient_window == node.data.window) {
+        if (result != 0) {
             node.data.modified = true;
         }
 
@@ -642,12 +644,14 @@ pub const Layout = struct {
     pub fn handleEnterNotify(self: *Layout, event: *const c.XCrossingEvent) !void {
         if (event.window == self.statusbar.x_drawable) return;
 
-        // Do NOT make it the focused window
-        _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
+        if (self.workspaces.items.len == 0) return;
+        if (self.workspaces.items.len == 1) return;
 
         const win = self.windowToNode(event.window);
 
-        if (self.workspaces.items.len == 1) return;
+        if (event.window == self.workspaces.items[self.current_ws].current_focused_window.data.window) {
+            _ = c.XSetInputFocus(@constCast(self.x_display), event.window, c.RevertToParent, c.CurrentTime);
+        }
 
         var attributes: c.XWindowAttributes = undefined;
         _ = c.XGetWindowAttributes(@constCast(self.x_display), event.window, &attributes);
@@ -683,6 +687,7 @@ pub const Layout = struct {
 // TODO: add the ability to create a initially modified floating window
 // TODO: EWMH _NET_WM_FULLSCREEN atom
 // TODO: when resizing, set minimum window size
+// TODO: fix logic for retileAllWindows when deleting windows and a master is deleted so the top right (second last) slave must be promoted
 // Ideas: add the ability to control window x and y position using mod4+Arrow Keys
 // Ideas: add the ability to swap to windows (X|Y) -> (Y|X)
 // Ideas: add some custom keybind commands such as opening tock and centering it to the screen with a specific width and height

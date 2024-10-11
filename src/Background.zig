@@ -29,6 +29,7 @@ pub const Background = struct {
             .x_rootwindow = rootwindow,
             .x_screen = screen,
             .background = undefined,
+            .background_image_index = undefined,
         };
 
         const scr = c.DefaultScreen(@constCast(background.x_display));
