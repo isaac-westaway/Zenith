@@ -136,6 +136,25 @@ pub const Background = struct {
 
         var images: [Config.number_of_images]Imlib.Imlib_Image = undefined;
 
+        const t1_index_to_load: usize = @divFloor(Config.number_of_images, 3);
+        const t2_index_to_load: usize = @divFloor(Config.number_of_images, 3) + t1_index_to_load;
+        var t3_index_to_load: usize = Config.number_of_images - t1_index_to_load;
+
+        _ = t2_index_to_load;
+
+        switch (Config.number_of_images % 3) {
+            0 => {},
+            1 => {
+                t3_index_to_load += 1;
+            },
+            2 => {
+                t3_index_to_load += 2;
+            },
+            else => unreachable,
+        }
+
+        // Create 3 new thread
+
         for (0..Config.number_of_images) |index| {
             const file_path = std.fmt.allocPrint(allocator.*, "{s}{s}-{d}.{s}", .{ Config.image_directory, Config.image_file_name, index, Config.image_file_extension }) catch unreachable;
 
@@ -174,5 +193,7 @@ pub const Background = struct {
                 std.posix.nanosleep(@intCast(timeout.tv_sec), @intCast(timeout.tv_nsec));
             }
         }
-    } //animateBackground
+    } // animateBackground
+
+    pub fn async_loader() !void {} // asyncLoader
 };
