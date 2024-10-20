@@ -3,7 +3,8 @@ const builtin = @import("builtin");
 
 const c = @import("x11.zig").c;
 
-// const Layout = @import("Layout.zig").Layout;
+// the manager struct should be in control of the background and statusbar
+
 const Input = @import("Input.zig");
 const Atoms = @import("Atoms.zig");
 const Layout = @import("Layout.zig");
@@ -50,18 +51,37 @@ pub const Manager = struct {
 
         _ = c.xcb_change_window_attributes(manager.xcb_connection, manager.xcb_screen.root, c.XCB_CW_EVENT_MASK, &event_mask_list);
 
-        Input.setupKeybinds(manager.x_display, manager.x_rootwindow);
-        Atoms.setupAtoms(manager.xcb_connection, manager.xcb_screen.root);
-        Layout.setupLayout();
+        {
+            Input.setupKeybinds(manager.x_display, manager.x_rootwindow);
+            Atoms.setupAtoms(manager.xcb_connection, manager.xcb_screen.root);
+            Layout.setupLayout();
+        }
 
         // setup cursor
         return manager;
     } // init
 
     pub fn run(self: *Manager) !void {
-        _ = self;
-        // try Logger.Log.info("ZWM_RUN", "Running the window manager", .{});
-        while (true) {}
+        var e: *c.xcb_generic_event_t = undefined;
+
+        while (true) {
+            e = c.xcb_wait_for_event(self.xcb_connection);
+
+            switch (e.response_type & ~@as(u8, 0x80)) {
+                c.XCB_KEY_PRESS => {
+                    std.posix.exit(1);
+                },
+
+                c.XCB_MAP_REQUEST => {
+                    Layout.handleMapRequest(e);
+                },
+                else => {
+                    // Handle other event types if necessary
+                },
+            }
+
+            // Free the event when done
+        }
     } // run
 
     pub fn handleError(_: ?*c.Display, event: [*c]c.XErrorEvent) callconv(.C) c_int {

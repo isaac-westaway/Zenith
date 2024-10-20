@@ -16,5 +16,5 @@ pub fn main() !void {
     };
     defer manager.deinit();
 
-    // try manager.run();
+    try manager.run();
 } // main

@@ -55,7 +55,7 @@ pub const terminal_cmd: []const u8 = "kitty";
 
 /// The number of workspaces you want to start out with, must be at least one
 /// You are also able to dynamically create more workspaces using a keybind
-pub const inital_number_of_workspaces: comptime_int = 5;
+pub const initial_number_of_workspaces: comptime_int = 5;
 
 /// Set this to true if you would like to see a statusbar
 /// Currently the statusbar is a work in progress, so it is best to keep this as false and only true for development purposes
