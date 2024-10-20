@@ -1,9 +1,11 @@
 const std = @import("std");
 
+// currently broken
+
 const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
 
-const Window = @import("Window.zig").Window;
+const Client = @import("Window.zig").Client;
 
 const Atoms = @import("Atoms.zig");
 
@@ -15,8 +17,8 @@ pub const Workspace = struct {
     x_display: *const c.Display,
     x_rootwindow: c.Window,
 
-    windows: std.DoublyLinkedList(Window),
-    current_focused_window: *std.DoublyLinkedList(Window).Node,
+    windows: std.DoublyLinkedList(Client),
+    current_focused_window: *std.DoublyLinkedList(Client).Node,
 
     fullscreen: bool,
     fs_window: *std.DoublyLinkedList(Window).Node,

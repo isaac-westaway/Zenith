@@ -1,99 +1,70 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const root = @import("root");
 
 const c = @import("x11.zig").c;
 
-const Layout = @import("Layout.zig").Layout;
-const Input = @import("Input.zig").Input;
+// const Layout = @import("Layout.zig").Layout;
+const Input = @import("Input.zig");
+const Atoms = @import("Atoms.zig");
+const Layout = @import("Layout.zig");
+
+pub const ManagerInitErrors = error{ XorgDisplayFail, XCBConnectionFail };
 
 pub const Manager = struct {
-    allocator: *std.mem.Allocator,
+    allocator: *const std.mem.Allocator,
 
-    x_display: *const c.Display,
-    x_screen: *c.Screen,
+    x_display: *c.Display,
     x_rootwindow: c.Window,
 
-    layout: Layout,
-    input: Input,
+    xcb_connection: *c.xcb_connection_t,
+    xcb_ewmh_connection: *c.xcb_ewmh_connection_t,
+    xcb_screen: *c.xcb_screen_t,
 
-    pub fn init(allocator: *std.mem.Allocator) !Manager {
+    /// Initializer method for the entire window manager
+    pub fn init(allocator: *const std.mem.Allocator) ManagerInitErrors!Manager {
         var manager: Manager = undefined;
 
         manager.allocator = allocator;
 
-        manager.x_display = c.XOpenDisplay(null) orelse std.posix.exit(1);
-        manager.x_screen = c.XDefaultScreenOfDisplay(@constCast(manager.x_display));
-        manager.x_rootwindow = c.XDefaultRootWindow(@constCast(manager.x_display));
+        {
+            manager.x_display = c.XOpenDisplay(null) orelse return ManagerInitErrors.XorgDisplayFail;
+            manager.x_rootwindow = c.XRootWindow(manager.x_display, 0);
+            manager.xcb_connection = c.XGetXCBConnection(manager.x_display) orelse return ManagerInitErrors.XCBConnectionFail;
+        }
 
-        manager.layout = try Layout.init(manager.allocator, manager.x_display, manager.x_rootwindow);
-        manager.input = try Input.init(manager.allocator, manager.x_display, manager.x_rootwindow);
+        _ = c.XSetErrorHandler(handleError);
+        _ = c.XSetEventQueueOwner(manager.x_display, c.XCBOwnsEventQueue);
 
-        _ = c.XSetErrorHandler(Manager.handleError);
+        {
+            // contiguous mode and non contiguous mode
+            const screen: c.xcb_screen_iterator_t = c.xcb_setup_roots_iterator(c.xcb_get_setup(manager.xcb_connection));
+            manager.xcb_screen = screen.data;
+        }
 
-        var window_attributes: c.XSetWindowAttributes = undefined;
-        window_attributes.event_mask = c.SubstructureRedirectMask | c.SubstructureNotifyMask;
+        const event_mask_list = [_]u32{c.XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
+            c.XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+            c.XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+            c.XCB_EVENT_MASK_ENTER_WINDOW |
+            c.XCB_EVENT_MASK_FOCUS_CHANGE |
+            c.XCB_EVENT_MASK_POINTER_MOTION};
 
-        _ = c.XSelectInput(@constCast(manager.x_display), manager.x_rootwindow, window_attributes.event_mask);
+        _ = c.xcb_change_window_attributes(manager.xcb_connection, manager.xcb_screen.root, c.XCB_CW_EVENT_MASK, &event_mask_list);
 
-        _ = c.XSync(@constCast(manager.x_display), 0);
+        Input.setupKeybinds(manager.x_display, manager.x_rootwindow);
+        Atoms.setupAtoms(manager.xcb_connection, manager.xcb_screen.root);
+        Layout.setupLayout();
 
+        // setup cursor
         return manager;
     } // init
 
     pub fn run(self: *Manager) !void {
+        _ = self;
         // try Logger.Log.info("ZWM_RUN", "Running the window manager", .{});
-        while (true) {
-            var event: c.XEvent = undefined;
-            _ = c.XNextEvent(@constCast(self.x_display), &event);
-
-            switch (event.type) {
-                c.KeyPress => {
-                    try self.layout.resolveKeyInput(&event.xkey);
-                },
-
-                c.ButtonPress => {
-                    try self.layout.handleButtonPress(@constCast(&event.xbutton));
-                },
-
-                c.PointerMotionMask => {
-                    // try Logger.Log.info("ZWM_RUN", "Pointer Motion Event: {any}", .{event.xmotion});
-                },
-
-                c.MotionNotify => {
-                    try self.layout.handleMotionNotify(&event.xmotion);
-                },
-
-                c.CreateNotify => {
-                    try self.layout.handleCreateNotify(&event.xcreatewindow);
-                },
-
-                c.DestroyNotify => {
-                    try self.layout.handleDestroyNotify(&event.xdestroywindow);
-                },
-
-                c.MapRequest => {
-                    try self.layout.handleMapRequest(&event.xmaprequest);
-                },
-
-                c.EnterNotify => {
-                    try self.layout.handleEnterNotify(&event.xcrossing);
-                },
-
-                c.LeaveNotify => {
-                    try self.layout.handleLeaveNotify(&event.xcrossing);
-                },
-
-                c.FocusIn => {
-                    // try Logger.Log.info("ZWM_RUN", "Focus In Event", .{});
-                },
-
-                else => {},
-            }
-        }
+        while (true) {}
     } // run
 
-    fn handleError(_: ?*c.Display, event: [*c]c.XErrorEvent) callconv(.C) c_int {
+    pub fn handleError(_: ?*c.Display, event: [*c]c.XErrorEvent) callconv(.C) c_int {
         const evt: *c.XErrorEvent = @ptrCast(event);
         switch (evt.error_code) {
             c.BadMatch => {

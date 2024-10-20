@@ -20,6 +20,8 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
     exe.linkSystemLibrary("Imlib2");
     exe.linkSystemLibrary("X11");
+    exe.linkSystemLibrary("X11-xcb");
+    exe.linkSystemLibrary("xcb");
     exe.linkSystemLibrary("Xinerama");
 
     b.installArtifact(exe);

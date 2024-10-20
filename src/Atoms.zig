@@ -1,79 +1,85 @@
 const std = @import("std");
 
+const Config = @import("config");
+
 const c = @import("x11.zig").c;
 
-pub var zenith_main_factor: c.Atom = undefined;
-pub var utf8_string: c.Atom = undefined;
-pub var wm_protocols: c.Atom = undefined;
-pub var wm_delete: c.Atom = undefined;
-pub var wm_take_focus: c.Atom = undefined;
-pub var wm_state: c.Atom = undefined;
-pub var wm_change_state: c.Atom = undefined;
-pub var net_supported: c.Atom = undefined;
-pub var net_wm_strut: c.Atom = undefined;
-pub var net_wm_strut_partial: c.Atom = undefined;
-pub var net_wm_window_type: c.Atom = undefined;
-pub var net_wm_window_type_dock: c.Atom = undefined;
-pub var net_wm_window_type_dialog: c.Atom = undefined;
-pub var net_wm_state: c.Atom = undefined;
-pub var net_wm_state_fullscreen: c.Atom = undefined;
-pub var net_wm_desktop: c.Atom = undefined;
-pub var net_number_of_desktops: c.Atom = undefined;
-pub var net_current_desktop: c.Atom = undefined;
-pub var net_active_window: c.Atom = undefined;
-pub var net_client_list: c.Atom = undefined;
-pub var net_supporting_wm_check: c.Atom = undefined;
-pub var net_wm_window_opacity: c.Atom = undefined;
+const WMAtoms = enum(u8) { WM_protocols = 0, WM_delete, WM_state, WM_take_focus, WM_count };
+const EWMHAtoms = enum(u8) { EWMH_supported = 0, EWMH_name, EWMH_state, EWMH_state_hidden, EWMH_check, EWMH_fullscreen, EWMH_active_window, EWMH_window_type, EWMH_window_type_dialog, EWMH_client_list, EWMH_current_desktop, EWMH_number_of_desktops, EWMH_desktop_names, EWMH_count };
 
-pub const Atoms = struct {
-    allocator: *std.mem.Allocator,
-
-    x_display: *const c.Display,
-    x_rootwindow: *const c.Window,
-
-    pub fn init(allocator: *std.mem.Allocator, display: *const c.Display, window: *const c.Window) !Atoms {
-        const atoms: Atoms = Atoms{
-            .allocator = allocator,
-
-            .x_display = display,
-            .x_rootwindow = window,
-        };
-
-        zenith_main_factor = c.XInternAtom(@constCast(display), "ZWM_MAIN_FACTOR", 0);
-        utf8_string = c.XInternAtom(@constCast(display), "UTF8_STRING", 0);
-        wm_protocols = c.XInternAtom(@constCast(display), "WM_PROTOCOLS", 0);
-        wm_delete = c.XInternAtom(@constCast(display), "WM_DELETE_WINDOW", 0);
-        wm_take_focus = c.XInternAtom(@constCast(display), "WM_TAKE_FOCUS", 0);
-        wm_state = c.XInternAtom(@constCast(display), "WM_STATE", 0);
-        wm_change_state = c.XInternAtom(@constCast(display), "WM_CHANGE_STATE", 0);
-        net_supported = c.XInternAtom(@constCast(display), "_NET_SUPPORTED", 0);
-        net_wm_strut = c.XInternAtom(@constCast(display), "_NET_WM_STRUT", 0);
-        net_wm_strut_partial = c.XInternAtom(@constCast(display), "_NET_WM_STRUT_PARTIAL", 0);
-        net_wm_window_type = c.XInternAtom(@constCast(display), "_NET_WM_WINDOW_TYPE", 0);
-        net_wm_window_type_dock = c.XInternAtom(@constCast(display), "_NET_WM_WINDOW_TYPE_DOCK", 0);
-        net_wm_window_type_dialog = c.XInternAtom(@constCast(display), "_NET_WM_WINDOW_TYPE_DIALOG", 0);
-        net_wm_state = c.XInternAtom(@constCast(display), "_NET_WM_STATE", 0);
-        net_wm_state_fullscreen = c.XInternAtom(@constCast(display), "_NET_WM_STATE_FULLSCREEN", 0);
-        net_wm_desktop = c.XInternAtom(@constCast(display), "_NET_WM_DESKTOP", 0);
-        net_number_of_desktops = c.XInternAtom(@constCast(display), "_NET_NUMBER_OF_DESKTOPS", 0);
-        net_current_desktop = c.XInternAtom(@constCast(display), "_NET_CURRENT_DESKTOP", 0);
-        net_active_window = c.XInternAtom(@constCast(display), "_NET_ACTIVE_WINDOW", 0);
-        net_client_list = c.XInternAtom(@constCast(display), "_NET_CLIENT_LIST", 0);
-        net_supporting_wm_check = c.XInternAtom(@constCast(display), "_NET_SUPPORTING_WM_CHECK", 0);
-        net_wm_window_opacity = c.XInternAtom(@constCast(display), "_NET_WM_WINDOW_OPACITY", 0);
-
-        const supported_net_atoms = [_]c.Atom{ net_supported, net_wm_strut, net_wm_strut_partial, net_wm_window_type, net_wm_window_type_dock, net_wm_window_type_dialog, net_wm_state, net_wm_state_fullscreen, net_wm_desktop, net_number_of_desktops, net_current_desktop, net_active_window, net_client_list, net_supporting_wm_check, net_wm_window_opacity };
-        _ = c.XChangeProperty(
-            @constCast(atoms.x_display),
-            c.XDefaultRootWindow(@constCast(atoms.x_display)),
-            net_supported,
-            c.XA_ATOM,
-            32,
-            c.PropModeReplace,
-            @ptrCast(&supported_net_atoms),
-            supported_net_atoms.len,
-        );
-
-        return atoms;
-    } // init
+const Atoms = struct {
+    wm_atoms: [@intFromEnum(WMAtoms.WM_count)]c.xcb_atom_t,
+    ewmh_atoms: [@intFromEnum(EWMHAtoms.EWMH_count)]c.xcb_atom_t,
 };
+
+pub var atoms: Atoms = undefined;
+
+/// A lot of this code is copied from ragnar since I don't really understand some of the atom concepts
+pub fn setupAtoms(xcb_connection: *c.xcb_connection_t, xcb_root_window: c.xcb_window_t) void {
+    atoms = Atoms{
+        .wm_atoms = undefined,
+        .ewmh_atoms = undefined,
+    };
+
+    atoms.wm_atoms[@intFromEnum(WMAtoms.WM_protocols)] = getAtom("WM_PROTOCOLS", xcb_connection);
+    atoms.wm_atoms[@intFromEnum(WMAtoms.WM_delete)] = getAtom("WM_DELETE_WINDOW", xcb_connection);
+    atoms.wm_atoms[@intFromEnum(WMAtoms.WM_state)] = getAtom("WM_STATE", xcb_connection);
+    atoms.wm_atoms[@intFromEnum(WMAtoms.WM_take_focus)] = getAtom("WM_TAKE_FOCUS", xcb_connection);
+
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_supported)] = getAtom("_NET_SUPPORTED", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_name)] = getAtom("_NET_WM_NAME", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_state)] = getAtom("_NET_WM_STATE", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_state_hidden)] = getAtom("_NET_STATE_HIDDEN", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_check)] = getAtom("_NET_SUPPORTING_WM_CHECK", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_fullscreen)] = getAtom("_NET_WM_STATE_FULLSCREEN", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_active_window)] = getAtom("_NET_ACTIVE_WINDOW", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_window_type)] = getAtom("_NET_WM_WINDOW_TYPE", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_window_type_dialog)] = getAtom("_NET_WM_WINDOW_TYPE_DIALOG", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_client_list)] = getAtom("_NET_CLIENT_LIST", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_current_desktop)] = getAtom("_NET_CURRENT_DESKTOP", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_number_of_desktops)] = getAtom("_NET_NUMBER_OF_DESKTOPS", xcb_connection);
+    atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_desktop_names)] = getAtom("_NET_DESKTOP_NAMES", xcb_connection);
+
+    const utf_8_str: c.xcb_atom_t = getAtom("UTF8_STRING", xcb_connection);
+
+    const wm_check_win: c.xcb_atom_t = c.xcb_generate_id(xcb_connection);
+
+    _ = c.xcb_create_window(xcb_connection, c.XCB_COPY_FROM_PARENT, wm_check_win, xcb_root_window, 0, 0, 1, 1, 0, c.XCB_WINDOW_CLASS_INPUT_OUTPUT, c.XCB_COPY_FROM_PARENT, 0, null);
+
+    // set _NET_WM_CHECK on the dummy window
+    _ = c.xcb_change_property(xcb_connection, c.XCB_PROP_MODE_REPLACE, wm_check_win, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_check)], c.XCB_ATOM_WINDOW, 32, 1, &wm_check_win);
+
+    // set the name of the window manager, _NET_WM_NAME
+    _ = c.xcb_change_property(xcb_connection, c.XCB_PROP_MODE_REPLACE, wm_check_win, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_name)], utf_8_str, 8, 7, "Zenith");
+
+    // set the _NET_WM_CHECK on root window
+    _ = c.xcb_change_property(xcb_connection, c.XCB_PROP_MODE_REPLACE, xcb_root_window, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_check)], c.XCB_ATOM_WINDOW, 32, 1, &wm_check_win);
+
+    // set _NET_CURRENT_DESKTOP on root window
+    const zero = 0;
+    const current_desktop: *const anyopaque = @ptrCast(&zero);
+    _ = c.xcb_change_property(xcb_connection, c.XCB_PROP_MODE_REPLACE, xcb_root_window, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_current_desktop)], c.XCB_ATOM_CARDINAL, 32, 1, current_desktop);
+
+    // set _NET_SUPPORTED
+    _ = c.xcb_change_property(xcb_connection, c.XCB_PROP_MODE_REPLACE, xcb_root_window, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_supported)], c.XCB_ATOM_ATOM, 32, @intFromEnum(EWMHAtoms.EWMH_count), @as(*const anyopaque, @ptrCast(&atoms.ewmh_atoms)));
+
+    // delete the current list of windows
+    _ = c.xcb_delete_property(xcb_connection, xcb_root_window, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_client_list)]);
+
+    // TODO: multi monitor atoms
+
+    const inital_number_of_workspaces: *const anyopaque = @ptrCast(&Config.inital_number_of_workspaces);
+    _ = c.xcb_change_property(xcb_connection, c.XCB_PROP_MODE_REPLACE, xcb_root_window, atoms.ewmh_atoms[@intFromEnum(EWMHAtoms.EWMH_number_of_desktops)], c.XCB_ATOM_CARDINAL, 32, 1, inital_number_of_workspaces);
+
+    _ = c.xcb_flush(xcb_connection);
+} // setupAtoms
+
+fn getAtom(atom_string: []const u8, xcb_connection: *c.xcb_connection_t) c.xcb_atom_t {
+    const cookie: c.xcb_intern_atom_cookie_t = c.xcb_intern_atom(xcb_connection, 0, @intCast(atom_string.len), @ptrCast(&atom_string));
+    const reply: ?*c.xcb_intern_atom_reply_t = c.xcb_intern_atom_reply(xcb_connection, cookie, null);
+    defer if (reply) |r| c.free(r);
+
+    if (reply) |r| return r.atom;
+
+    return c.XCB_ATOM_NONE;
+} // getAtom

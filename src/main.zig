@@ -7,8 +7,14 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
-    var manager: Manager = try Manager.init(@constCast(&allocator));
+    var manager = Manager.init(&allocator) catch |err| {
+        switch (err) {
+            error.XorgDisplayFail, error.XCBConnectionFail => {
+                std.posix.exit(1);
+            },
+        }
+    };
     defer manager.deinit();
 
-    try manager.run();
+    // try manager.run();
 } // main
