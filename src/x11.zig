@@ -4,6 +4,7 @@ pub const c = @cImport({
     @cInclude("xcb/xcb.h");
     @cInclude("xcb/xproto.h");
     @cInclude("xcb/xcb_cursor.h");
+    @cInclude("xcb/xcb_keysyms.h");
 
     @cInclude("xcb/xcb_atom.h");
     @cInclude("xcb/xcb_ewmh.h");

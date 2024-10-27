@@ -1,13 +1,22 @@
 ///
 /// Once you are done editing this file, run `make all` to rebuild the project
 ///
-const c = @cImport({
+pub const c = @cImport({
+    @cInclude("xcb/xcb.h");
+    @cInclude("xcb/xproto.h");
+    @cInclude("xcb/xcb_cursor.h");
+
+    @cInclude("xcb/xcb_atom.h");
+    @cInclude("xcb/xcb_ewmh.h");
+    @cInclude("xcb/xcb_icccm.h");
+
     @cInclude("X11/Xlib.h");
     @cInclude("X11/XF86keysym.h");
     @cInclude("X11/keysym.h");
     @cInclude("X11/XKBlib.h");
     @cInclude("X11/Xatom.h");
     @cInclude("X11/Xutil.h");
+    @cInclude("X11/Xlib-xcb.h");
 });
 
 /// The command to be executed when running picom, if you would like to run picom, if not leave it as: ""
@@ -66,91 +75,114 @@ pub const enable_statusbar: bool = false;
 /// At the most extreme of cases, this integer should be less thaan 500, though you should never really use more than 20 pixels
 pub const window_gap_width: comptime_int = 10;
 
-///
-/// Keybinds
-///
-/// You can list out the available super keys on your keyboard by running `xmodmap` in your terminal
-/// A super key is a key that is run alongside another key, like ctrl + enter, in this example, ctrl is the super key, the super key for control is c.Control mask
-/// The `mask` is just X11's way of saying "this must be fulfilled"
-/// You should have intellisense for zig installed if you would like a list of keys, or you can read the source code
-/// Open the terminal
-pub const terminal_super: c.Mask = c.Mod4Mask;
-pub const terminal_key: c.KeySym = c.XK_Return;
-
-/// Close the window manager
-pub const close_super: c.Mask = c.Mod4Mask;
-pub const close_key: c.Mask = c.XK_Escape;
-
-/// Cycle focus in the forward direction
-pub const cycle_forward_super: c.Mask = c.Mod4Mask;
-pub const cycle_forward_key: c.Mask = c.XK_Tab;
-
-/// Cycle focus in the reverse direction
-/// This is intentional, though might be changed later if people really want it changed
-/// Essentially the exact same keybinds as with cycling forward, just with an extra super key
-pub const cycle_backward_super_second: c.Mask = c.ShiftMask;
-
-/// This is just for taking images of the window manager, using scrot
-pub const scrot_super: c.Mask = c.Mod4Mask;
-pub const scrot_key: c.Mask = c.XK_l;
-
-/// Set the currently focused window to fullscreen
-pub const fullscreen_super: c.Mask = c.Mod4Mask;
-pub const fullscreen_key: c.Mask = c.XK_f;
-
-/// Close the currently focused window, NOT the window manager
-pub const close_window_super: c.Mask = c.Mod4Mask;
-pub const close_window_key: c.Mask = c.XK_q;
-
-/// Push the currently focused window forward a workspace
-pub const push_forward_super: c.Mask = c.Mod4Mask;
-pub const push_forward_key: c.Mask = c.XK_p;
-
-/// Push the currently focused window back one workspace
-pub const push_backward_super: c.Mask = c.Mod4Mask;
-pub const push_backward_key: c.Mask = c.XK_o;
-
-/// Cycle to the nnext workspace
-pub const workspace_cycle_forward_super: c.Mask = c.Mod4Mask;
-pub const workspace_cycle_forward_key: c.Mask = c.XK_d;
-
-/// Cycle to the previous workspace
-pub const workspace_cycle_backward_super: c.Mask = c.Mod4Mask;
-pub const workspace_cycle_backward_key: c.Mask = c.XK_a;
-
-/// Unfocus the current window by making the window slightly transparent
-/// Kinda useless, for aesthetic purposes
-pub const unfocus_super: c.Mask = c.Mod4Mask;
-pub const unfocus_key: c.Mask = c.XK_grave;
-
-/// Append a new workspace at the end of the workspace list
-pub const worskpace_append_super: c.Mask = c.Mod4Mask;
-pub const workspace_append_key: c.Mask = c.XK_equal;
-
-/// Pop the last workspace in the list of workspaces, 1,2,3,4,5 -> 1,2,3,4
-pub const workspace_pop_super: c.Mask = c.Mod4Mask;
-pub const workspace_pop_key: c.Mask = c.XK_minus;
-
-/// Swap the left (master) window with the top right
-pub const swap_left_right_master_super: c.Mask = c.Mod4Mask;
-pub const swap_left_right_mastker_key: c.Mask = c.XK_1;
-
-/// Add the currently focused window as the master window in the unmodified layouot
-pub const add_focused_master_super: c.Mask = c.Mod4Mask;
-pub const add_focused_master_key: c.Mask = c.XK_2;
-
-/// Add the currently focused window as a "slave" window in the unmodified layout
-pub const add_focused_slave_super: c.Mask = c.Mod4Mask;
-pub const add_focused_slave_key: c.Mask = c.XK_3;
-
-/// Add the current
-/// Move the window by pressing and dragging the left mouse button
-/// The compile time integer must correspond to the integer in mouse_motion_left
-/// Only change this if you know that X11 supports your key, I cannot add support on my own, it is up to Xorg (or wayland once Zenith supports it)
-/// To handle the necessary mouse drivers
 pub const mouse_button_left: comptime_int = 1;
 pub const mouse_motion_left: c.Mask = c.Button1MotionMask;
 
 /// Resize by clicking and dragging
 pub const mouse_button_right: comptime_int = 3;
 pub const mouse_motion_right: c.Mask = c.Button3MotionMask;
+
+///
+/// Keybinds
+///
+pub const Key = struct { key_mask: c.xcb_mod_mask_t, key_sym: c.xcb_keysym_t };
+pub const key_binds: []const Key = &.{
+    // Modify these keys
+    // Exit out of the window manager
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_Return,
+    },
+
+    // Close the window wmanager
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_Escape,
+    },
+
+    // Cycle focus in the forward direction
+    Key{ .key_mask = c.Mod4Mask, .key_sym = c.XK_Tab },
+
+    // Cycle focus in the reverse direction
+    // This is intentional, though might be changed later if people really want it changed
+    // Essentially the exact same keybinds as with cycling forward, just with an extra super key
+    Key{ .key_mask = c.ShiftMask, .key_sym = c.XK_Tab },
+
+    // This is just for taking images of the window manager, using scrot
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_1,
+    },
+
+    // Make the currently focused window fullscreen
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_f,
+    },
+
+    // Close the currently focused window
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_q,
+    },
+
+    // Push the focused window forward a workspace
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_p,
+    },
+
+    // Push the focused window back one workspace
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_o,
+    },
+
+    // Cycle to the next workspace
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_d,
+    },
+
+    // Cycle to the previous workspace
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_a,
+    },
+
+    // Unfocus the current window
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_grave,
+    },
+
+    // Append a new workspace
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_equal,
+    },
+
+    // Pop the last workspace
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_minus,
+    },
+
+    // Swap the master window with the top right
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_1,
+    },
+
+    // Add the currently focused window as the master
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_2,
+    },
+
+    // Add the currently focused window as a slave window
+    Key{
+        .key_mask = c.Mod4Mask,
+        .key_sym = c.XK_3,
+    },
+};

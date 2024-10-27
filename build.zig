@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("X11");
     exe.linkSystemLibrary("X11-xcb");
     exe.linkSystemLibrary("xcb");
+    exe.linkSystemLibrary("xcb-keysyms");
     exe.linkSystemLibrary("Xinerama");
 
     b.installArtifact(exe);

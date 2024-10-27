@@ -1,340 +1,46 @@
+/// Per monitor object of available desktops
+/// One workspace per monitor, 6 (or whatever the config has defined) desktops per workspace
 const std = @import("std");
 
-// currently broken
-
-const x11 = @import("x11.zig");
 const c = @import("x11.zig").c;
-
-const Client = @import("Window.zig").Client;
-
-const Atoms = @import("Atoms.zig");
-
-const Actions = @import("actions.zig");
 
 const Config = @import("config");
 
-pub const Workspace = struct {
-    x_display: *const c.Display,
-    x_rootwindow: c.Window,
-
-    windows: std.DoublyLinkedList(Client),
-    current_focused_window: *std.DoublyLinkedList(Client).Node,
-
-    fullscreen: bool,
-    fs_window: *std.DoublyLinkedList(Window).Node,
-
-    mouse: c.XButtonEvent,
-
-    win_x: i32,
-    win_y: i32,
-    win_w: i32,
-    win_h: i32,
-
-    screen_w: i32,
-    screen_h: i32,
-
-    pub fn moveToStart(self: *Workspace, node: *std.DoublyLinkedList(Window).Node) void {
-        self.windows.remove(node);
-        self.windows.prepend(node);
-    } // moveToStart
-
-    pub fn moveToEnd(self: *Workspace, node: *std.DoublyLinkedList(Window).Node) void {
-        self.windows.remove(node);
-        self.windows.append(node);
-    } // moveToEnd
-
-    pub fn numberOfWindowsModified(self: *const Workspace) struct { number: u64, last_unmodified: *std.DoublyLinkedList(Window).Node } {
-        if (self.windows.len == 0) return .{
-            .number = 0,
-            .last_unmodified = undefined,
-        };
-
-        var start: ?*std.DoublyLinkedList(Window).Node = self.windows.last;
-
-        var number_of_windows_modified: usize = 0;
-        var last_unmodified: *std.DoublyLinkedList(Window).Node = undefined;
-        while (start) |win| : (start = win.prev) {
-            if (win.data.modified) {
-                number_of_windows_modified += 1;
-            } else {
-                last_unmodified = win;
-            }
-        }
-
-        return .{
-            .number = number_of_windows_modified,
-            .last_unmodified = last_unmodified,
-        };
-    } // numberOfWindowsModified
-
-    fn windowToNode(self: *const Workspace, window: c.Window) ?*std.DoublyLinkedList(Window).Node {
-        var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
-
-        while (ptr) |node| : (ptr = node.next) {
-            if (node.data.window == window) {
-                return node;
-            } else continue;
-        }
-
-        return null;
-    } // windowToNode
-
-    pub fn handleFullscreen(self: *Workspace) !void {
-        if (self.fullscreen == false) {
-            var attributes: c.XWindowAttributes = undefined;
-
-            _ = c.XGetWindowAttributes(@constCast(self.x_display), self.current_focused_window.data.window, &attributes);
-
-            const window = self.windowToNode(self.current_focused_window.data.window);
-
-            if (window) |win| {
-                win.data.f_x = attributes.x;
-                win.data.f_y = attributes.y;
-
-                // Why is it possible that the width and height of the window be negative????
-                win.data.f_w = @abs(attributes.width);
-                win.data.f_h = @abs(attributes.height);
-
-                // Border width is zero as it is fullscreen
-                _ = c.XSetWindowBorderWidth(@constCast(self.x_display), win.data.window, 0);
-
-                _ = c.XRaiseWindow(@constCast(self.x_display), win.data.window);
-                _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, 0, 0);
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @as(c_uint, @intCast(self.screen_w)), @as(c_uint, @intCast(self.screen_h)));
-
-                _ = c.XSetInputFocus(@constCast(self.x_display), win.data.window, c.RevertToPointerRoot, c.CurrentTime);
-
-                self.fs_window = @ptrCast(window);
-            }
-
-            self.fullscreen = true;
-
-            return;
-        }
-
-        if (self.fullscreen == true) {
-            _ = c.XSetWindowBorderWidth(@constCast(self.x_display), self.fs_window.data.window, Config.border_width);
-
-            _ = c.XMoveWindow(@constCast(self.x_display), self.fs_window.data.window, self.fs_window.data.f_x, self.fs_window.data.f_y);
-            _ = c.XResizeWindow(@constCast(self.x_display), self.fs_window.data.window, @as(c_uint, @intCast(self.fs_window.data.f_w)), @as(c_uint, @intCast(self.fs_window.data.f_h)));
-
-            _ = c.XSetInputFocus(@constCast(self.x_display), self.fs_window.data.window, c.RevertToPointerRoot, c.CurrentTime);
-
-            self.fullscreen = false;
-
-            return;
-        }
-    } // handleFullscreen
-
-    pub fn focusOneUnfocusAll(self: *Workspace) !void {
-        if (self.windows.len > 0) {
-            _ = c.XRaiseWindow(@constCast(self.x_display), self.current_focused_window.data.window);
-            _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToPointerRoot, c.CurrentTime);
-            _ = c.XSetWindowBorder(@constCast(self.x_display), self.current_focused_window.data.window, Config.hard_focused);
-
-            _ = c.XSetInputFocus(@constCast(self.x_display), self.current_focused_window.data.window, c.RevertToPointerRoot, c.CurrentTime);
-
-            x11.setWindowPropertyScalar(@constCast(self.x_display), self.x_rootwindow, Atoms.net_active_window, c.XA_WINDOW, self.current_focused_window.data.window);
-
-            var ptr: ?*std.DoublyLinkedList(Window).Node = self.windows.first;
-            while (ptr) |node| : (ptr = node.next) {
-                if (node.data.window != self.current_focused_window.data.window) {
-                    _ = c.XSetWindowBorder(@constCast(self.x_display), node.data.window, Config.unfocused);
-                } else continue;
-            }
-        } else return;
-    } // focuseOneUnfocusAll
-
-    pub fn closeFocusedWindow(self: *Workspace) !void {
-        if (self.windows.len == 0) return;
-
-        _ = c.XDestroyWindow(@constCast(self.x_display), self.current_focused_window.data.window);
-    } // closeFocusedWindow
-
-    pub fn retileAllWindows(self: *Workspace) void {
-        if (self.windows.len == 1) return;
-
-        const left_width: u32 = @abs(@divFloor(self.screen_w, 2) - (Config.window_gap_width + @divFloor(Config.window_gap_width, 2)));
-
-        if (!self.windows.last.?.data.modified) {
-            _ = c.XResizeWindow(@constCast(self.x_display), self.windows.last.?.data.window, left_width, @abs(self.screen_h - (2 * Config.window_gap_width)));
-            _ = c.XMoveWindow(@constCast(self.x_display), self.windows.last.?.data.window, Config.window_gap_width, Config.window_gap_width);
-        }
-
-        const number_of_windows_modified = self.numberOfWindowsModified();
-        const total_windows_to_be_modified = self.windows.len - number_of_windows_modified.number;
-
-        const right_width = left_width;
-        const remaining_height: u32 = @abs(self.screen_h - (Config.window_gap_width));
-
-        var right_window_height: u64 = 0;
-
-        if (total_windows_to_be_modified <= 1) {
-            right_window_height = @abs(self.screen_h) - (2 * Config.window_gap_width);
-        } else {
-            right_window_height = @divFloor(remaining_height - (total_windows_to_be_modified - 1) * Config.window_gap_width, (total_windows_to_be_modified - 1));
-        }
-
-        const last = self.windows.first;
-
-        if (last) |win| {
-            if (total_windows_to_be_modified == 1) {
-                // cache the window
-                const window = win;
-                self.windows.remove(win);
-
-                self.windows.append(window);
-            }
-        }
-
-        var start: ?*std.DoublyLinkedList(Window).Node = self.windows.last.?.prev.?;
-        var index: u64 = 0;
-        while (start) |win| : (start = win.prev) {
-            if (win.data.modified == false) {
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, right_width, @intCast(right_window_height));
-
-                _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, @intCast(left_width + 2 * Config.window_gap_width), @intCast(Config.window_gap_width + (index * (right_window_height + Config.window_gap_width))));
-                index += 1;
-            }
-        }
-    } // retileAllWindows
-
-    pub fn handleWindowMappingTiling(self: *Workspace, window: c.Window) !void {
-        const number_of_windows_modified = self.numberOfWindowsModified();
-        const total_windows_to_be_modified = self.windows.len - number_of_windows_modified.number;
-        if (total_windows_to_be_modified >= 2) {
-            self.retileAllWindows();
-        } else {
-            // THE RIGHT SIDE WIDTH DOES NOT LOOK EQUAL BUT MATHEMATICALLY IT IS!!!
-            _ = c.XResizeWindow(@constCast(self.x_display), window, @abs(self.screen_w - (2 * Config.window_gap_width)), @abs(self.screen_h - (2 * Config.window_gap_width)));
-            _ = c.XMoveWindow(@constCast(self.x_display), window, Config.window_gap_width, Config.window_gap_width);
-        }
-    } // handleWindowMapTiling
-
-    pub fn handleWindowDestroyTiling(self: *Workspace) !void {
-        if (self.windows.len == 0) return;
-
-        const window = self.windows.last;
-        if (window) |win| {
-            if (self.windows.len == 1 and win.data.modified == false) {
-                _ = c.XMoveWindow(@constCast(self.x_display), win.data.window, Config.window_gap_width, Config.window_gap_width);
-                _ = c.XResizeWindow(@constCast(self.x_display), win.data.window, @intCast(self.screen_w - (2 * Config.window_gap_width)), @abs(self.screen_h - (2 * Config.window_gap_width)));
-            }
-        }
-
-        if (self.windows.len >= 2) {
-            self.retileAllWindows();
-        }
-    } // handleWindowDestroyTiling
-
-    // TODO: minor update, swapping left right master, when more than two initially modified windows, creating 2 unmodified windows and swapping leads
-    // To odd behavious, where the window goes off screen
-    pub fn swapLeftRightMaster(self: *Workspace) !void {
-        if (self.current_focused_window.data.modified) return;
-        if (self.windows.len == 1 or self.windows.len == 0) return;
-
-        const total_to_be_modified = self.windows.len - self.numberOfWindowsModified().number;
-        if (total_to_be_modified == 1 or total_to_be_modified == 0) return;
-
-        if (self.windows.len == 2) {
-            if (self.current_focused_window.data.window == self.windows.first.?.data.window) {
-                self.moveToEnd(@ptrCast(self.windows.first));
-
-                self.retileAllWindows();
-
-                return;
-            } else if (self.current_focused_window.data.window == self.windows.last.?.data.window) {
-                self.moveToStart(@ptrCast(self.windows.last));
-
-                self.retileAllWindows();
-
-                return;
-            }
-        }
-
-        // If the master window, then swap the master with the topright
-        // TODO: to update to the first window that is NOT modifiable
-        // do it in a function of find first unmodified
-        if (self.current_focused_window.data.window == self.windows.last.?.data.window) {
-            const top_right_window = self.windows.last.?.prev;
-
-            self.moveToEnd(@ptrCast(top_right_window));
-
-            self.windows.remove(self.current_focused_window);
-            self.windows.insertBefore(@ptrCast(self.windows.last), self.current_focused_window);
-
-            self.retileAllWindows();
-        } else if (self.current_focused_window.data.window == self.windows.last.?.prev.?.data.window) {
-            self.moveToEnd(self.current_focused_window);
-
-            self.retileAllWindows();
-        } else {
-            const current_focused_window = self.current_focused_window.data.window;
-
-            var previous_window_node: *std.DoublyLinkedList(Window).Node = undefined;
-            var start = self.windows.last;
-            while (start) |win| : (start = win.prev) {
-                if (win.data.window == current_focused_window) break else {
-                    previous_window_node = win;
-                }
-            }
-
-            self.moveToEnd(self.current_focused_window);
-
-            const now_second_last = self.windows.last.?.prev;
-
-            self.windows.remove(@ptrCast(now_second_last));
-            self.windows.insertBefore(@constCast(previous_window_node), @ptrCast(now_second_last));
-
-            self.retileAllWindows();
-        }
-
-        return;
-    } // swapLeftRightMaster
-
-    pub fn addWindowAsMaster(self: *Workspace) !void {
-        if (self.windows.len == 0) return;
-
-        if (self.windows.len == 1) {
-            _ = c.XMoveWindow(@constCast(self.x_display), self.current_focused_window.data.window, Config.window_gap_width, Config.window_gap_width);
-            _ = c.XResizeWindow(@constCast(self.x_display), self.current_focused_window.data.window, @abs(self.screen_w) - 2 * Config.window_gap_width, @abs(self.screen_h) - 2 * Config.window_gap_width);
-            return;
-        }
-
-        if (self.current_focused_window.data.modified == false) {
-            if (self.current_focused_window.data.window != self.windows.last.?.data.window) {
-                try self.swapLeftRightMaster();
-            } else return; // if the current focused window already is the unmodified master, do nothing
-        } else {
-            self.moveToEnd(self.current_focused_window);
-            self.current_focused_window.data.modified = false;
-
-            self.retileAllWindows();
-        }
-    } // addWindowAsMaster
-
-    pub fn addWindowAsSlave(self: *Workspace) !void {
-        if (self.windows.len == 0) return;
-
-        if (self.windows.len == 1) {
-            _ = c.XMoveWindow(@constCast(self.x_display), self.current_focused_window.data.window, Config.window_gap_width, Config.window_gap_width);
-            _ = c.XResizeWindow(@constCast(self.x_display), self.current_focused_window.data.window, @abs(self.screen_w) - 2 * Config.window_gap_width, @abs(self.screen_h) - 2 * Config.window_gap_width);
-            return;
-        }
-        if (self.current_focused_window.data.modified == false) {
-            if (self.current_focused_window.data.window == self.windows.last.?.data.window) {
-                try self.swapLeftRightMaster();
-            } else return; // it is already a "slave" window
-        } else {
-            self.moveToEnd(self.current_focused_window);
-            self.moveToEnd(@ptrCast(self.windows.last.?.prev));
-            self.current_focused_window.data.modified = false;
-
-            self.retileAllWindows();
-        }
-    } // addWindowAsSlave
-
-    pub fn swapLeftRightRightLeft(self: *Workspace) !void {
-        _ = self;
-    }
+const Client = @import("Client.zig");
+
+pub const TypeWorkspace = struct {
+    // desktops: std.ArrayList(Desktop),
+    client_list: std.DoublyLinkedList(Client.TypeClient),
 };
+// mapEngine()
+// config: map as breadth first
+// or map as depth firsta
+
+// The Client.zig should provide methods to modify the workspace, such as making the client floating, or fullscreening a client
+
+// handle ewmh
+// should the arguments of addWorkspace be the first in the list or the list itself
+pub fn addWorkspace(allocator: *std.mem.Allocator, first: std.DoublyLinkedList(TypeWorkspace).Node) !*std.DoublyLinkedList(TypeWorkspace).Node {
+    const workspace: TypeWorkspace = TypeWorkspace{ .client_list = std.DoublyLinkedList(Client.TypeClient){} };
+
+    var start = first;
+    while (start) : (start = start.next) {
+        // iterate through for ewmh
+    }
+
+    // Might want to add error handling
+    var workspace_node: *std.DoublyLinkedList(TypeWorkspace).Node = try allocator.create(std.DoublyLinkedList(TypeWorkspace).Node);
+    workspace_node.data = workspace;
+
+    return workspace_node;
+} // setupWorkspace
+
+// The map request should take in a std.DoublyLinkedList(TypeWorkspace).Node.data and perform what addWorkspace does on addClient
+pub fn handleMapRequest(allocator: *std.mem.Allocator, connection: *c.xcb_connection_t, event: *c.xcb_generic_event_t) void {
+    const e: *c.xcb_map_request_event_t = @ptrCast(event);
+
+    const cookie: c.xcb_void_cookie_t = c.xcb_map_window(connection, e.window);
+
+    _ = cookie;
+    _ = allocator;
+}

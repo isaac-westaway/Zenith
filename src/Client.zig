@@ -1,6 +1,6 @@
 const c = @import("x11.zig").c;
 
-pub const ClientTags = enum(u8) {
+pub const TagsClient = enum(u8) {
     fullscreen = 1 << 0, // 00000001
     modified = 1 << 1, // 00000010
     urgent = 1 << 2, // 00000100,
@@ -8,7 +8,7 @@ pub const ClientTags = enum(u8) {
     old_state = 1 << 4, // 00010000
 };
 
-pub const Client = struct {
+pub const TypeClient = struct {
     window: c.Window,
 
     // Any potential features of the manageed client
@@ -29,17 +29,19 @@ pub const Client = struct {
     // monitor: Monitor // have not implemented multi monitor suport yet
 
     /// Add a tag from the enumeration
-    pub fn addTag(self: *Client, tag: ClientTags) void {
+    pub fn addTag(self: *TypeClient, tag: TagsClient) void {
         self.tags |= @as(u8, tag);
     }
 
     /// Remove a tag
-    pub fn removeTag(self: *Client, tag: ClientTags) void {
+    pub fn removeTag(self: *TypeClient, tag: TagsClient) void {
         self.tags &= ~@as(u8, tag);
     }
 
     /// Check if the client has the tag
-    pub fn checkTag(self: *Client, tag: ClientTags) bool {
+    pub fn checkTag(self: *TypeClient, tag: TagsClient) bool {
         return (self.tags & @as(u8, tag)) != 0;
     }
 };
+
+// addClient();
