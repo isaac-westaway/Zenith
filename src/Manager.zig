@@ -29,11 +29,12 @@ pub const ManagerType = struct {
     xcb_connection: *c.xcb_connection_t,
     xcb_ewmh_connection: *c.xcb_ewmh_connection_t,
     xcb_screen: *c.xcb_screen_t,
+    xcb_rootscreen: c.xcb_window_t,
 
     // The current desktop should be replaced with the current monitor and then
     // the current desktop move into current monitor
     workspaces: std.DoublyLinkedList(Workspace.TypeWorkspace),
-    current_workspace: std.DoublyLinkedList(Workspace.TypeWorkspace).Node,
+    current_workspace_id: std.DoublyLinkedList(Workspace.TypeWorkspace).Node,
 };
 
 pub var manager: ManagerType = undefined;
@@ -56,6 +57,7 @@ pub fn setupManager(allocator: *std.mem.Allocator) ErrorManagerInit!void {
         // contiguous mode and non contiguous mode
         const screen: c.xcb_screen_iterator_t = c.xcb_setup_roots_iterator(c.xcb_get_setup(manager.xcb_connection));
         manager.xcb_screen = screen.data;
+        manager.xcb_rootscreen = screen.data.*.root;
     }
 
     const event_mask_list = [_]u32{c.XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
@@ -72,12 +74,14 @@ pub fn setupManager(allocator: *std.mem.Allocator) ErrorManagerInit!void {
 
         // TODO: check if there is only one workspace
         for (0..Config.initial_number_of_workspaces) |_| {
-            // pass a pointer to the last element
-            // the setup workspace should appe
-
-            const node = Workspace.addWorkspace(manager.allocator, &std.DoublyLinkedList(Workspace.TypeWorkspace)) catch unreachable;
+            const node = Workspace.createWorkspace(manager.allocator) catch unreachable;
 
             manager.workspaces.append(node);
+
+            var first: ?*std.DoublyLinkedList(Workspace.TypeWorkspace).Node = manager.workspaces.first;
+            while (first != null) : (first = first.?.next) {
+                // TODO: ewmh change desktop numbers
+            }
         }
 
         Atoms.setupAtoms(manager.xcb_connection, manager.xcb_screen.root);
@@ -97,7 +101,8 @@ pub fn runManager() void {
             },
 
             c.XCB_MAP_REQUEST => {
-                Workspace.handleMapRequest(manager.allocator, manager.xcb_connection, e);
+                // TODO: get_current_workspace(current_workspace_id) current_workspace_id and then client list
+                Workspace.handleMapRequest(manager.allocator, manager.xcb_connection, e, manager.current_workspace.data.client_list.first.?);
                 // Monitor.handleMapRequest(e);
             },
             else => {

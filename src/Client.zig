@@ -1,10 +1,10 @@
 const c = @import("x11.zig").c;
 
 pub const TagsClient = enum(u8) {
-    fullscreen = 1 << 0, // 00000001
-    modified = 1 << 1, // 00000010
-    urgent = 1 << 2, // 00000100,
-    never_take_focus = 1 << 3, // 00001000
+    fullscreen = 1 << 0, // 00000001 // having this set should be a NON tiling state
+    modified = 1 << 1, // 00000010 // having this set should be a NON tiling state
+    urgent = 1 << 2, // 00000100, // having this set COULD be a NON tiling state
+    never_take_focus = 1 << 3, // 00001000 // having this set should be a NON tiling state
     old_state = 1 << 4, // 00010000
 };
 
